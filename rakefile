@@ -1,0 +1,104 @@
+task :default do
+  puts(Rake::Task.tasks.map{|task| task.name} - ['default'])
+end
+
+namespace 'test' do
+  desc 'run all tests'
+    task 'all' => %w[ unit integration ] do
+    end
+
+  desc 'run unit tests'
+    task 'unit' do
+      %w[
+      ].each do |basename|
+        This.test_loader "test/unit/#{ basename }.rb"
+      end
+    end
+
+  desc 'run integration tests'
+    task 'integration' do
+      %w[
+        sdb/base
+      ].each do |basename|
+        This.test_loader "test/integration/#{ basename }.rb", :require_auth => true
+      end
+    end
+end
+
+task 'test' => 'test:all' do
+end
+
+
+BEGIN {
+  ENV['PATH'] = [ '.', './bin/', ENV['PATH'] ].join(File::PATH_SEPARATOR)
+
+  $VERBOSE = nil
+
+  require 'ostruct'
+  require 'erb'
+  require 'fileutils'
+
+  Fu = FileUtils
+
+  This = OpenStruct.new
+
+  This.file = File.expand_path(__FILE__)
+  This.dir = File.dirname(This.file)
+  This.pkgdir = File.join(This.dir, 'pkg')
+
+  lib = ENV['LIB']
+  unless lib
+    lib = File.basename(Dir.pwd)
+  end
+  This.lib = lib
+
+  version = ENV['VERSION']
+  unless version
+    name = lib.capitalize
+    require "./lib/#{ lib }"
+    version = eval(name).send(:version)
+  end
+  This.version = version
+
+  abort('no lib') unless This.lib
+  abort('no version') unless This.version
+
+  module Util
+    def indent(s, n = 2)
+      s = unindent(s)
+      ws = ' ' * n
+      s.gsub(%r/^/, ws)
+    end
+
+    def unindent(s)
+      indent = nil
+      s.each do |line|
+      next if line =~ %r/^\s*$/
+      indent = line[%r/^\s*/] and break
+    end
+    indent ? s.gsub(%r/^#{ indent }/, "") : s
+  end
+    extend self
+  end
+
+  class Template
+    def initialize(&block)
+      @block = block
+      @template = block.call.to_s
+    end
+    def expand(b=nil)
+      ERB.new(Util.unindent(@template)).result(b||@block)
+    end
+    alias_method 'to_s', 'expand'
+  end
+  def Template(*args, &block) Template.new(*args, &block) end
+
+  def This.test_loader basename, options = {}
+    auth = '-r test/auth.rb ' if options[:require_auth]
+    command = "ruby -r test/loader.rb #{ auth }#{ basename }"
+    STDERR.print "\n==== TEST ====\n\n  #{ command }\n\n==============\n\n"
+    system command or abort("#{ command } # FAILED WITH #{ $?.inspect }")
+  end
+
+  Dir.chdir(This.dir)
+}

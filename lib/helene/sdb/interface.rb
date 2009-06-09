@@ -5,11 +5,11 @@ module Helene
       
       include RightAwsBaseInterface
 
-      DEFAULT_HOST      = 'sdb.amazonaws.com'
-      DEFAULT_PORT      = 443
-      DEFAULT_PROTOCOL  = 'https'
-      API_VERSION       = '2007-11-07'
-      DEFAULT_NIL_REPRESENTATION = 'nil'
+      DEFAULT_HOST               = 'sdb.amazonaws.com' unless defined?(DEFAULT_HOST)
+      DEFAULT_PORT               = 443                 unless defined?(DEFAULT_PORT)
+      DEFAULT_PROTOCOL           = 'https'             unless defined?(DEFAULT_PROTOCOL)
+      API_VERSION                = '2007-11-07'        unless defined?(API_VERSION)
+      DEFAULT_NIL_REPRESENTATION = 'nil'               unless defined?(DEFAULT_NIL_REPRESENTATION)
 
       @@bench = AwsBenchmarkingBlock.new
       def self.bench_xml; @@bench.xml;     end
