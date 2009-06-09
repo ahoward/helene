@@ -5,18 +5,17 @@
 module Helene
   module Sdb
     class Base
-      Kernel.load 'helene/right_http_connection_monkey_patches.rb'
-      # Kernel.load 'helene/right_aws_monkey_patches.rb'
-      Kernel.load 'helene/sdb/base/error.rb'
-      Kernel.load 'helene/wtf.rb'
-      Kernel.load 'helene/sdb/base/logging.rb'
-      Kernel.load 'helene/sdb/base/connection.rb'
-      Kernel.load 'helene/sdb/base/type.rb'
-      Kernel.load 'helene/sdb/base/types.rb'
-      Kernel.load 'helene/sdb/base/validations.rb'
-      Kernel.load 'helene/sdb/base/attributes.rb'
-      Kernel.load 'helene/sdb/base/associations.rb'
-      Kernel.load 'helene/sdb/base/transactions.rb'
+      load 'helene/right_http_connection_monkey_patches.rb'
+      load 'helene/right_aws_monkey_patches.rb'
+      load 'helene/sdb/base/error.rb'
+      load 'helene/sdb/base/logging.rb'
+      load 'helene/sdb/base/connection.rb'
+      load 'helene/sdb/base/type.rb'
+      load 'helene/sdb/base/types.rb'
+      load 'helene/sdb/base/validations.rb'
+      load 'helene/sdb/base/attributes.rb'
+      load 'helene/sdb/base/associations.rb'
+      load 'helene/sdb/base/transactions.rb'
 
       class << Base
       # track children
@@ -44,8 +43,15 @@ module Helene
           else
             @domain = value.to_s
           end
+        ensure
+          while @domain.size < 3
+            @domain = "#{ @domain }_"
+          end
         end
-        attr_writer 'domain'
+
+        def domain=(value)
+          domain(value)
+        end
 
         def set_domain_name(value)
           domain(value)

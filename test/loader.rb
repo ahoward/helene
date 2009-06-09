@@ -11,6 +11,9 @@
   $test_integration_lib_dir = File.join($test_integration_dir, 'lib')
   $test_config_file = File.join($test_dir, 'config.yml')
 
+  $test_integration_setup_guard = File.join($test_integration_dir, '.guard')
+  $test_log = File.join($test_dir, 'log')
+
   $load_path = [$lib_dir, $test_dir, $test_lib_dir]
   $load_path.each{|load_path| $LOAD_PATH.unshift(load_path)}
   ENV['RUBYLIB'] = $LOAD_PATH.join(File::PATH_SEPARATOR)
@@ -18,8 +21,14 @@
   Dir.chdir($src_dir)
 
   require 'test/unit'
-  #require 'socket'
+
+  begin
+    require 'rubygems'
+  rescue LoadError
+    nil
+  end
+
+  require 'shoulda'
+
   require File.join($lib_dir, 'helene')
-  require File.join('shoulda')
-  #require File.join($test_lib_dir, 'xmlsimple')
   require File.join($test_dir, 'helper')

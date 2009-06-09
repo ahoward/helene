@@ -11,17 +11,30 @@ namespace 'test' do
     task 'unit' do
       %w[
       ].each do |basename|
-        This.test_loader "test/unit/#{ basename }.rb"
+        test_loader "test/unit/#{ basename }.rb"
       end
     end
 
   desc 'run integration tests'
     task 'integration' do
+      # test_loader 'test/integration/setup.rb'
+      # open($test_integration_setup_guard, 'w'){|fd| fd.puts Time.now.utc.iso8601(2) }
+
       %w[
         sdb/base
       ].each do |basename|
-        This.test_loader "test/integration/#{ basename }.rb", :require_auth => true
+
+        test_loader('test/integration/begin.rb', :require_auth => true)
+
+        begin
+          test_loader "test/integration/#{ basename }.rb", :require_auth => true
+        rescue Object
+          test_loader('test/integration/ensure.rb', :require_auth => true)
+          raise
+        end
       end
+
+      # test_loader 'test/integration/teardown.rb'
     end
 end
 
@@ -34,6 +47,7 @@ BEGIN {
 
   $VERBOSE = nil
 
+  require 'time'
   require 'ostruct'
   require 'erb'
   require 'fileutils'
@@ -93,10 +107,10 @@ BEGIN {
   end
   def Template(*args, &block) Template.new(*args, &block) end
 
-  def This.test_loader basename, options = {}
+  def test_loader basename, options = {}
     auth = '-r test/auth.rb ' if options[:require_auth]
     command = "ruby -r test/loader.rb #{ auth }#{ basename }"
-    STDERR.print "\n==== TEST ====\n\n  #{ command }\n\n==============\n\n"
+    STDERR.print "\n==== TEST ====\n  #{ command }\n\n==============\n"
     system command or abort("#{ command } # FAILED WITH #{ $?.inspect }")
   end
 

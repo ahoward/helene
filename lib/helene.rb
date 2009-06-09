@@ -24,7 +24,7 @@ module Helene
   require 'uuidtools'
   require 'arrayfields'
 
-# load support
+# helene load support
 #
   def Helene.libdir(*args)
     @libdir ||= File.expand_path(File.dirname(__FILE__))
@@ -48,12 +48,12 @@ module Helene
     end
   end
 
-# boot helene
+# helene
 #
   Helene.load_path do
     load 'helene/error.rb'
     load 'helene/util.rb'
-    load 'helene/logger.rb'
+    load 'helene/logging.rb'
     load 'helene/config.rb'
     load 'helene/aws.rb'
     load 'helene/sdb.rb'

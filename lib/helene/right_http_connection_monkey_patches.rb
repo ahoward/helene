@@ -1,19 +1,5 @@
 module Rightscale
   class HttpConnection
-=begin
-    params[:debug_output] = RAILS_ENV!='production' ? STDERR : nil
-
-    alias_method '__start__', 'start' unless instance_methods.include?('__start__')
-
-    def start(*args, &block)
-      __start__(*args, &block)
-    ensure
-      debug_output = get_param(:debug_output)
-      @http.instance_variable_set('@debug_output', debug_output) if debug_output
-      #p @http.instance_variable_set(@debug_output, params[:debug_output])
-      p @http.instance_variable_get('@debug_output')
-    end
-=end
     alias_method '__request__', 'request' unless instance_methods.include?('__request__')
 
     def request(request_params, &block)
@@ -39,5 +25,16 @@ module Rightscale
         logger.debug{ "HttpConnection - response.body=#{ body.inspect }" }
       end
     end
+
+    Initialize = instance_method(:initialize)
+
+    def initialize(*args, &block)
+      Initialize.bind(self).call(*args, &block)
+    ensure
+      @logger = Helene.logger
+    end
   end
 end
+
+
+RAILS_DEFAULT_LOGGER = Helene.logger unless defined?(RAILS_DEFAULT_LOGGER) ### WTF?
