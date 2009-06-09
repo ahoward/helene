@@ -19,7 +19,7 @@ module Helene
 
 # gems
 #
-  require 'active_support' unless defined?(Rails)
+  require 'active_support' unless defined?(ActiveSupport)
   require 'right_aws'
   require 'uuidtools'
   require 'arrayfields'
