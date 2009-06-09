@@ -112,6 +112,10 @@ module Helene
       decompress(Base64.decode64(data.to_s))
     end
 
+    def uuid
+      UUID.timestamp_create().to_s
+    end
+
     extend self
   end
 end

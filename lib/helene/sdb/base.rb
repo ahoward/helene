@@ -43,10 +43,10 @@ module Helene
           else
             @domain = value.to_s
           end
-        ensure
           while @domain.size < 3
             @domain = "#{ @domain }_"
           end
+          @domain
         end
 
         def domain=(value)
@@ -113,7 +113,7 @@ module Helene
       # id methods
       #
         def generate_uuid
-          UUID.timestamp_create().to_s
+          Util.uuid
         end
 
         def generate_id
@@ -123,11 +123,15 @@ module Helene
       # create
       #
         def create(attributes={})
-          new(attributes).save
+          record = new(attributes)
+          record.save
+          record
         end
 
         def create!(attributes={})
-          new(attributes).save!
+          record = new(attributes)
+          record.save!
+          record
         end
 
       # prepare attributes from sdb for ruby
@@ -198,8 +202,17 @@ module Helene
         attr_accessor :next_token
 
         def select(*args, &block)
-          sql = sql_for_select(*args, &block)
-          execute_select(sql, *args, &block)
+          statements = sql_for_select(*args, &block)
+          statements = [statements].flatten
+
+          if statements.size == 1
+            sql = statements.first
+            execute_select(sql, *args, &block)
+          else
+            statements.threadify do |sql|
+              execute_select(sql, *args, &block)
+            end.flatten
+          end
         end
         alias_method 'find', 'select'
 
@@ -216,7 +229,16 @@ module Helene
                 options[:limit] = 1
                 :first
               else
-                options[:ids] = listify(args)
+                ids = listify(args)
+                if ids.size > 20
+                  results =
+                    ids.threadify(:each_slice, 20) do |slice|
+                      sql = sql_for_select(slice, options)
+                      execute_select(sql, slice)
+                    end
+                  return results.flatten
+                end
+                options[:ids] = ids
                 args.size == 1 ? :id : :ids
             end
 
@@ -268,10 +290,6 @@ module Helene
                 options[:ids] = listify(args)
                 args.size == 1 ? :id : :ids
             end
-
-          #unless [:select, :domain, :conditions, :order, :limit, :ids].any?{|key| options.has_key?(key)}
-            #options[:conditions] = options
-          ##end
 
           select     = sql_select_for(options[:select])
           from       = options[:domain] || options[:from] || domain
@@ -486,7 +504,6 @@ module Helene
         end
       end
 
-
       attr_accessor 'id'
       attr_accessor 'new_record'
       alias_method 'new_record?', 'new_record'
@@ -584,7 +601,7 @@ module Helene
         connection.put_attributes(domain, id, sdb_attributes, :replace)
         virtually_load(sdb_attributes)
         mark_as_old!
-        self
+        errors.empty?
       end
 
       def virtually_save(ruby_attributes)

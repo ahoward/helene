@@ -8,6 +8,7 @@ module Helene
 #
   require 'ostruct'
   require 'logger'
+  require 'pathname'
 
 # rubygems
 #
@@ -22,12 +23,15 @@ module Helene
   require 'active_support' unless defined?(ActiveSupport)
   require 'right_aws'
   require 'uuidtools'
+  gem 'arrayfields', '>= 4.7.4'
   require 'arrayfields'
+  gem 'threadify', '>= 1.1.0'
+  require 'threadify'
 
 # helene load support
 #
   def Helene.libdir(*args)
-    @libdir ||= File.expand_path(File.dirname(__FILE__))
+    @libdir ||= Pathname.new(__FILE__).realpath.dirname
     if args.empty?
       @libdir
     else

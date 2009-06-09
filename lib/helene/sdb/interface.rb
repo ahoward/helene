@@ -22,6 +22,7 @@ module Helene
       def initialize(aws_access_key_id=nil, aws_secret_access_key=nil, params={})
         @nil_rep = params[:nil_representation] ? params[:nil_representation] : DEFAULT_NIL_REPRESENTATION
         params.delete(:nil_representation)
+        params[:multi_thread] = true unless params.has_key?(:multi_thread)
         init({ :name             => 'SDB', 
                :default_host     => ENV['SDB_URL'] ? URI.parse(ENV['SDB_URL']).host   : DEFAULT_HOST, 
                :default_port     => ENV['SDB_URL'] ? URI.parse(ENV['SDB_URL']).port   : DEFAULT_PORT, 
