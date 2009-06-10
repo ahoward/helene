@@ -2,11 +2,15 @@ module Helene
   module Sdb
     class Base
       class Type
-        INT_N_BYTES = [42].pack('i').size
-        INT_N_BITS = INT_N_BYTES * 8
-        INT_MAX = 2 ** (INT_N_BITS - 2) - 1
-        INT_MIN = -INT_MAX - 1
-        INT_OFF = INT_MAX / 2
+        INT_N_BYTES  = [42].pack('i').size
+        INT_N_BITS   = INT_N_BYTES * 8
+        INT_MAX      = 2 ** (INT_N_BITS - 2) - 1
+        INT_MIN      = -INT_MAX - 1
+        INT_OFF      = INT_MAX / 2
+        INT_MAX_SIZE = INT_MAX.to_s.size
+        INT_MIN_SIZE = INT_MAX.to_s.size
+        INT_SIZE     = [INT_MAX_SIZE, INT_MIN_SIZE].max
+        INT_FMT      = "%0#{ INT_SIZE }d"
 
         class << Type
           def ruby_to_sdb(value=nil, &block)

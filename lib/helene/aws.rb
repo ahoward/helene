@@ -31,5 +31,20 @@ module Helene
       )
     end
     attr_writer :aws_secret_access_key
+
+    def aws_ca_file(*value)
+      self.aws_ca_file = value.first unless value.empty?
+
+      @aws_ca_file ||= (
+        candidates = %w[ AWS_CA_FILE AMAZON_CA_FILE CA_FILE ]
+        candidates.each do |candidate|
+          return Object.const_get(candidate) if Object.const_defined?(candidate)
+        end
+        candidates.each do |candidate|
+          return ENV[candidate] if ENV[candidate]
+        end
+      )
+    end
+    attr_writer :aws_ca_file
   end
 end

@@ -5,3 +5,4 @@
 #
   Helene.aws_access_key_id     # raises error unless configured
   Helene.aws_secret_access_key # raises error unless configured
+  Helene.aws_ca_file               # does not raise - just bootstrap

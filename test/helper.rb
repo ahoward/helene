@@ -17,7 +17,13 @@ module Helene
       end
 
       def eventually_assert(label = nil, &block)
-        42.times do
+        min = 0.01
+        max = 1.28
+        sleeps = []
+        m = min
+        while m < max; sleeps << m and m *= 2; end
+        
+        42.times do |i|
           bool = block.call
           if bool
             args = [bool, label]
@@ -25,7 +31,7 @@ module Helene
             return true
           end
           STDERR.puts "#{ label.to_s.inspect } not true yet..."
-          sleep(rand)
+          sleep(sleeps[ i % sleeps.size ])
         end
         false
       end

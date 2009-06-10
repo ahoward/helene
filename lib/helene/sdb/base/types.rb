@@ -26,11 +26,11 @@ module Helene
 
         type(:timestamp){
           ruby_to_sdb do |value|
-            Time.parse(value.to_s).iso8601(2)
+            Time.parse(value.to_s).utc.iso8601(2)
           end
 
           sdb_to_ruby do |value|
-            Time.parse(Array(value).first.to_s)
+            Time.parse(Array(value).first.to_s).localtime
           end
         }
 
@@ -48,7 +48,7 @@ module Helene
           ruby_to_sdb do |value|
             number = Integer(value.to_s)
             raise ArgumentError, "(#{ name } = #{ number.inspect }) < 0" if number < 0
-            '%011d' % number
+            INT_FMT % number
           end
 
           sdb_to_ruby do |value|
@@ -66,7 +66,7 @@ module Helene
                 "(#{ name } = #{ number.inspect } (offset=#{ offset })) too small"
               )
             end
-            '%011d' % offset
+            INT_FMT % offset
           end
 
           sdb_to_ruby do |array|

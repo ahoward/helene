@@ -290,10 +290,9 @@ module Helene
       end
 
       def select_response_to_ruby(response) #:nodoc:
+      #return response
         response[:items].each_with_index do |item, idx|
           item.each do |key, attributes|
-#p :before => attributes
-#puts
             attributes.keys.each do |name|
               values = attributes[name]
               array = values.delete('[]')
@@ -304,23 +303,6 @@ module Helene
                   sdb_to_ruby(values.first)
                 end
             end
-=begin
-            attributes.keys.each do |name|
-              value = attributes[name]
-              attributes[name] =
-                case value
-                  #when sdb_nil
-                    #nil
-                  when Array
-                    value.map{|val| sdb_to_ruby(val)}
-                  else
-                    sdb_to_ruby(value)
-                end
-            end
-=end
-#p :after => attributes
-#puts
-#puts
           end
         end
         response

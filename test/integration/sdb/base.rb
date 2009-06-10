@@ -1,7 +1,14 @@
 testing Helene::Sdb::Base do
 
   context 'creating' do
+    class A < Helene::Sdb::Base
+    end
+
+    should 'be able to create' do
+      assert{ A.create! }
+    end
   end
+
 
   context 'saving' do
     class A < Helene::Sdb::Base
@@ -19,6 +26,7 @@ testing Helene::Sdb::Base do
       assert{ B.new(:foo=>nil).save == false }
     end
   end
+
 
   context 'selecting' do
     class A < Helene::Sdb::Base
@@ -56,28 +64,31 @@ testing Helene::Sdb::Base do
   end
 
 
+=begin
   context 'associations' do
-    class A < Helene::Sdb::Base
-      one_to_many :bs
-    end
+    context 'one_to_many' do
+      class A < Helene::Sdb::Base
+        one_to_many :bs
+      end
 
-    class B < Helene::Sdb::Base
-      #many_to_one :as
-    end
+      class B < Helene::Sdb::Base
+        attribute :a_id
+      end
 
-    class C < Helene::Sdb::Base
-    end
+      setup do
+      end
 
-    setup do
-    end
+      should 'support simple one_to_many' do
+        a = assert{ A.create! }
+        assert{ a.respond_to?(:bs) }
+        b = assert{ B.create! }
+        #assert{ a.respond_to?(:a_id) }
+        #assert{ a.bs << b }
+        p a.bs
+      end
 
-    should 'do basic one_to_many' do
-      assert true  
-    end
-
-    should 'do basic many_to_one' do
-      assert true  
     end
   end
+=end
 
 end

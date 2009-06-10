@@ -1,6 +1,3 @@
-#
-### based losely off of right_aws-1.10.0/lib/sdb/active_sdb.rb
-#
  
 module Helene
   module Sdb
@@ -202,50 +199,46 @@ module Helene
         attr_accessor :next_token
 
         def select(*args, &block)
-          statements = sql_for_select(*args, &block)
-          statements = [statements].flatten
-
-          if statements.size == 1
-            sql = statements.first
-            execute_select(sql, *args, &block)
-          else
-            statements.threadify do |sql|
-              execute_select(sql, *args, &block)
-            end.flatten
-          end
+          sql = sql_for_select(*args, &block)
+          execute_select(sql, *args, &block)
         end
         alias_method 'find', 'select'
 
         def execute_select(sql, *args, &block)
           options = args.extract_options!.to_options!
-
           args.flatten!
-
-          which =
-            case args.first.to_s
-              when "", "all"
-                :all
-              when "first"
-                options[:limit] = 1
-                :first
-              else
-                ids = listify(args)
-                if ids.size > 20
-                  results =
-                    ids.threadify(:each_slice, 20) do |slice|
-                      sql = sql_for_select(slice, options)
-                      execute_select(sql, slice)
-                    end
-                  return results.flatten
-                end
-                options[:ids] = ids
-                args.size == 1 ? :id : :ids
-            end
 
           accum = options.delete(:accum) || OpenStruct.new(:items => [], :count => 0)
           raw = options.delete(:raw)
           @next_token = options.delete(:next_token)
           limit = Integer(options[:limit]) if options.has_key?(:limit)
+
+          if limit and limit > 2500
+            options[:_limit] = options.delete(:limit)
+          end
+
+          case args.first.to_s
+            when "", "all"
+              result_arity = -1
+              :all
+            when "first"
+              result_arity = 1
+              options[:limit] = 1
+              :first
+            else
+              ids = listify(args)
+              result_arity = args.size == 1 ? 1 : -1
+              if ids.size > 20
+                results =
+                  ids.threadify(:each_slice, 20) do |slice|
+                    sql = sql_for_select(slice, options)
+                    execute_select(sql, slice)
+                  end
+                results.flatten!
+                limit ? results[0,limit] : results
+              end
+              options[:ids] = ids
+          end
 
           result = connection.select(sql, @next_token)
           @next_token = result[:next_token]
@@ -271,14 +264,20 @@ module Helene
             end
           end
 
-          block ? accum.count : ([:id, :first].include?(which) ?  accum.items.first : accum.items)
+          if block
+            accum.count
+          else
+            if result_arity == 1
+              accum.items.first
+            else
+              limit ? accum.items[0,limit] : accum.items
+            end
+          end
         end
 
         def sql_for_select(*args)
           options = args.extract_options!.to_options!
-
           args.flatten!
-
           which =
             case args.first.to_s
               when "", "all"
@@ -295,8 +294,15 @@ module Helene
           from       = options[:domain] || options[:from] || domain
           conditions = !options[:conditions].blank? ? " WHERE #{ sql_conditions_for(options[:conditions]) }"   : ''
           order      = !options[:order].blank?      ? " ORDER BY #{ sort_options_for(options[:order]).join(' ') }" : ''
-          limit      = !options[:limit].blank?      ? " LIMIT #{ options[:limit] }"                            : ''
+          limit      = ''
           ids        = options[:ids] || []
+
+          [:_limit, :limit].each do |key|
+            if options.has_key?(key)
+              limit = " LIMIT #{ options[key] }"
+              break
+            end
+          end
 
           unless order.blank? # you must have a predicate for any attribute sorted on...
             sort_by, sort_order = sort_options_for(options[:order])
@@ -522,7 +528,7 @@ module Helene
         @id = args.size == 1 ? args.shift : generate_id
         @new_record = !!!options.delete(:new_record)
         @attributes = Attributes.for(options)
-        #klass.attributes.each{|attribute| attribute.initialize_record(self)}
+        klass.attributes.each{|attribute| attribute.initialize_record(self)}
       end
 
       def klass
@@ -597,12 +603,14 @@ module Helene
       def save_without_validation
         prepare_for_update
         sdb_attributes = ruby_to_sdb
-#p :sdb_attributes => sdb_attributes
         connection.put_attributes(domain, id, sdb_attributes, :replace)
         virtually_load(sdb_attributes)
         mark_as_old!
         errors.empty?
       end
+
+# TODO - Base.virtual_loading = true
+#
 
       def virtually_save(ruby_attributes)
         sdb_attributes = ruby_to_sdb(ruby_attributes)
@@ -718,11 +726,11 @@ module Helene
       end
 
       def created_at
-        Time.parse(attributes['created_at'].join) unless attributes['created_at'].blank?
+        Time.parse(attributes['created_at'].to_s) unless attributes['created_at'].blank?
       end
 
       def updated_at
-        Time.parse(attributes['updated_at'].join) unless attributes['updated_at'].blank?
+        Time.parse(attributes['updated_at'].to_s) unless attributes['updated_at'].blank?
       end
       
       def to_hash

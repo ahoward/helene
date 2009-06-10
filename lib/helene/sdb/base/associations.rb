@@ -31,9 +31,8 @@ module Helene
         end
 
         def associated_class
-          @associated_class ||= eval(class_name.to_s)
+          @associated_class ||= class_name.constanize
         end
-
 
 
         class OneToMany < Association
@@ -55,11 +54,11 @@ module Helene
             @foreign_key ||= "#{ @base.name.downcase }_id"
 
             @base.module_eval <<-__
-              def #{ name }_list(*args, &block)
+              def #{ name }(*args, &block)
                 #{ name }_association.list(self, *args, &block)
               end
 
-              def #{ name }_list=(*args, &block)
+              def #{ name }=(*args, &block)
                 raise NotImplementedError
               end
             __

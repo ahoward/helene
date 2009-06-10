@@ -63,4 +63,13 @@ module Helene
     load 'helene/sdb.rb'
     load 'helene/s3.rb'
   end
+
+# mega-hacks
+#
+  ca_file =
+    ENV['CA_FILE'] ||
+    ENV['AMAZON_CA_FILE'] ||
+    (defined?(AMAZON_CA_FILE) and AMAZON_CA_FILE) ||
+    (defined?(CA_FILE) and CA_FILE)
+  Rightscale::HttpConnection.params[:ca_file] = ca_file if ca_file
 end
