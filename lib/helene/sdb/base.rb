@@ -147,7 +147,7 @@ module Helene
           args.flatten!
           options = args.extract_options!.to_options!
           replace = options[:replace]
-          records = args
+          records = args.compact
           to_put = []
 
           records.each do |record|
@@ -270,8 +270,6 @@ module Helene
           raw = options.delete(:raw)
           @next_token = options.delete(:next_token)
 
-# TODO - this needs to be forced to 2500 and more gotten in the this case -
-# this won't work?? ;-(
           limit = Integer(options[:limit]) if options.has_key?(:limit)
           if limit and limit > 2500
             options[:limit] = 2500
@@ -320,6 +318,7 @@ module Helene
                 args,
                 options.merge(:next_token => @next_token, :raw => raw, :accum => accum)
               ].flatten
+              p :recurse => @next_token
               execute_select(*recurse, &block)
             else
               if accum.count < limit
@@ -327,6 +326,7 @@ module Helene
                   args,
                   options.merge(:next_token => @next_token, :raw => raw, :accum => accum, :limit => (limit - accum.count))
                 ].flatten
+              p :recurse => @next_token
                 execute_select(*recurse, &block)
               end
             end
@@ -818,7 +818,7 @@ module Helene
       end
       
       def prepare_for_update
-        time = Transaction.time
+        time = Transaction.time.iso8601(2)
         attributes['updated_at'] = time
         if new_record?
           attributes['created_at'] ||= time
