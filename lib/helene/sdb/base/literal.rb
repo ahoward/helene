@@ -3,13 +3,19 @@ module Helene
     class Base
       class Literal < ::String
         def Literal.for(*args)
-          new(args.join)
+          new(args.join).freeze
         end
         def literal?
           true
         end
         def literal
           self
+        end
+        def inspect
+          "#{ self.class.name }(#{ string.inspect })"
+        end
+        def string
+          "#{ self }"
         end
       end
 
@@ -27,6 +33,7 @@ module Helene
           args.all?{|arg| Literal === arg}
         end
       end
+
 
       def literal(*args)
         Literal.for(*args)

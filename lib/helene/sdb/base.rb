@@ -300,8 +300,8 @@ module Helene
                 if block
                   ids.each_slice(20){|slice| execute_select(*[slice, options], &block)}
                 else
-                  # records = ids.threadify(:each_slice, 20){|slice| execute_select(*[slice, options])}.flatten
-                  records = ids.each_slice(20){|slice| execute_select(*[slice, options].flatten)}.flatten
+                  records = ids.threadify(:each_slice, 20){|slice| execute_select(*[slice, options])}.flatten
+                  # records = ids.each_slice(20){|slice| execute_select(*[slice, options].flatten)}.flatten
                   return(limit ? records[0,limit] : records)
                 end
               end
@@ -398,16 +398,14 @@ module Helene
           sql = "SELECT #{ select } FROM #{ from } #{ conditions } #{ order } #{ limit }".strip
         end
 
+        ItemName = Literal.for('ItemName()') unless defined?(ItemName)
+        Splat = Literal.for('*') unless defined?(Splat)
+
         def sql_select_list_for(*list)
           list = listify list
-          if list.include?('id')
-            list[list.index('id')] = 'ItemName()'
-          end
-          if(list.include?('ItemName()') and list.size > 1)
-            raise ArgumentError, "can only select id *or* fields - not both"
-          end
-          sql = list.map{|attr| escape_attribute(attr =~ %r/id/ ? 'ItemName' : attr)}.join(',')
-          sql.blank? ? '*' : sql
+          list.map!{|attr| attr =~ %r/^\s*id\s*$/io ? ItemName : attr}
+          sql = list.map{|attr| escape_attribute(attr)}.join(',')
+          sql.blank? ? Splat : sql
         end
 
         def sql_conditions_for(conditions)
@@ -525,7 +523,6 @@ module Helene
         alias_method 'escape', 'escape_value'
 
         def escape_attribute(value)
-        return value
           return value if Literal?(value)
           "`#{ value.gsub(%r/`/, '``') }`"
         end
@@ -559,10 +556,19 @@ module Helene
               sort.push(:asc) if sort.size < 2
               sort.first(2).map{|s| s.to_s}
             else
-              sort.to_s[%r/['"]?(\w+)['"]? *(asc|desc)?/i]
+              sort.to_s[%r/['"]?(\w+)['"]? *(asc|desc)?/io]
               [$1, ($2 || 'asc')]
             end
-          [ pair.first.to_s.sub(%r/^id$/, 'ItemName()'), pair.last.to_s ]
+          [ quoted_attribute(pair.first), pair.last.to_s ]
+        end
+
+        def quoted_attribute attr
+          return attr if Literal?(attr)
+          if attr =~ %r/^\s*id\s*$/
+            ItemName
+          else
+            Literal(escape_attribute(attr))
+          end
         end
 
         def [](*ids)
