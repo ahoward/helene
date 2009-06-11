@@ -1,15 +1,20 @@
 ---
-- deleted_at handling
-
+- eat right_scale lib
 
 - detect arity of selects better (id vs list of ids)
 
 - belongs_to
 
-- bootstrap config info better (config file for instance)
-
+- deleted_at handling
 
 - hooks - before_save/etc
+
+
+
+- bootstrap config info better (config file for instance)
+
+- fucking MT bug in right_http_connection
+
 
 - handle delete_attributes(:list => nil)
 
@@ -23,12 +28,6 @@
 
 - test limit > 2500
 
-- BatchPutAttributes
-  - Base.batch_put (25 at a time)
-  - Base.batch_save
-  - Base.batch_create
-  - Base.batch_delete?
-
 - reconsider virtual loading stuff
 
 - test @next_token stuff a bunch
@@ -36,6 +35,11 @@
 
 
 ---
+- BatchPutAttributes
+  - Base.batch_put (25 at a time)
+  - Base.batch_save
+  - Base.batch_create
+  - Base.batch_delete?
 - Tansaction.time
 - handle != sanely (every())
 - handle [] in queries (every() bit)

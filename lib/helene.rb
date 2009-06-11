@@ -21,7 +21,6 @@ module Helene
 # gems
 #
   require 'active_support' unless defined?(ActiveSupport)
-  require 'right_aws'
   require 'uuidtools'
   gem 'arrayfields', '~> 4.7'
   require 'arrayfields'
@@ -47,12 +46,19 @@ module Helene
     Kernel.load lib
   end
 
-  def Helene.load(lib)
-    Kernel.load Helene.libdir(lib)
-  end
-
   def Helene.load_path(&block)
     $LOAD_PATH.unshift(Helene.libdir)
+    $LOAD_PATH.unshift(Helene.libdir('helene'))
+    begin
+      block.call
+    ensure
+      $LOAD_PATH.shift
+      $LOAD_PATH.shift
+    end
+  end
+
+  def Helene.rightscale_load_path(&block)
+    $LOAD_PATH.unshift(Helene.libdir('helene', 'rightscale'))
     begin
       block.call
     ensure
@@ -63,13 +69,17 @@ module Helene
 # helene
 #
   Helene.load_path do
-    load 'helene/error.rb'
-    load 'helene/util.rb'
-    load 'helene/logging.rb'
-    load 'helene/config.rb'
-    load 'helene/aws.rb'
-    load 'helene/sdb.rb'
-    load 'helene/s3.rb'
+    Helene.rightscale_load_path do
+      load 'right_http_connection.rb'
+      load 'right_aws.rb'
+    end
+    load 'error.rb'
+    load 'util.rb'
+    load 'logging.rb'
+    load 'config.rb'
+    load 'aws.rb'
+    load 'sdb.rb'
+    load 's3.rb'
   end
 
 # mega-hacks

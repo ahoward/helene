@@ -162,6 +162,14 @@ module Helene
               items = Hash[*slice.to_a.flatten]
               connection.batch_put_attributes(domain, items, options.update(:replace => replace))
             end.flatten
+=begin
+          results = []
+          to_put.each_slice(25) do |slice|
+            items = Hash[*slice.to_a.flatten]
+            results << connection.batch_put_attributes(domain, items, options.update(:replace => replace))
+          end
+          results.flatten!
+=end
 
           records.each do |record|
             record.virtually_load(record.ruby_to_sdb)
@@ -289,7 +297,8 @@ module Helene
                 if block
                   ids.each_slice(20){|slice| execute_select(*[slice, options], &block)}
                 else
-                  records = ids.threadify(:each_slice, 20){|slice| execute_select(*[slice, options])}.flatten
+                  # records = ids.threadify(:each_slice, 20){|slice| execute_select(*[slice, options])}.flatten
+                  records = ids.each_slice(20){|slice| execute_select(*[slice, options])}.flatten
                   return(limit ? records[0,limit] : records)
                 end
               end
@@ -318,7 +327,6 @@ module Helene
                 args,
                 options.merge(:next_token => @next_token, :raw => raw, :accum => accum)
               ].flatten
-              p :recurse => @next_token
               execute_select(*recurse, &block)
             else
               if accum.count < limit
@@ -326,7 +334,6 @@ module Helene
                   args,
                   options.merge(:next_token => @next_token, :raw => raw, :accum => accum, :limit => (limit - accum.count))
                 ].flatten
-              p :recurse => @next_token
                 execute_select(*recurse, &block)
               end
             end

@@ -64,10 +64,28 @@ module Helene
           :protocol => @params[:protocol] }
       end
 
+# TODO - need to dig much deeper into why this sometimes fails in MT
+# conditions
+#
       def request_info(request, parser)  #:nodoc:
-        thread = @params[:multi_thread] ? Thread.current : Thread.main
+        #thread = @params[:multi_thread] ? Thread.current : Thread.main
+        thread = Thread.current
         thread[:sdb_connection] ||= Rightscale::HttpConnection.new(:exception => AwsError, :logger => @logger)
-        request_info_impl(thread[:sdb_connection], @@bench, request, parser)
+        e = nil
+        42.times do
+          begin
+            return request_info_impl(thread[:sdb_connection], @@bench, request, parser)
+          rescue Object => e
+            raise unless e <= StandardError
+            m = e.message
+            c = e.class
+            b = (e.backtrace||[]).join("\n")
+            STDERR.puts "#{ m } (#{ c })\n#{ b }\n"
+            thread[:sdb_connection] = Rightscale::HttpConnection.new(:exception => AwsError, :logger => @logger)
+            next
+          end
+        end
+        raise(e || 'wtf')
       end
 
       def escape(value)
