@@ -76,11 +76,8 @@ module Helene
           begin
             return request_info_impl(thread[:sdb_connection], @@bench, request, parser)
           rescue Object => e
-            raise unless e <= StandardError
-            m = e.message
-            c = e.class
-            b = (e.backtrace||[]).join("\n")
-            STDERR.puts "#{ m } (#{ c })\n#{ b }\n"
+            raise unless e.class <= StandardError
+            @logger.error{ e } rescue nil
             thread[:sdb_connection] = Rightscale::HttpConnection.new(:exception => AwsError, :logger => @logger)
             next
           end

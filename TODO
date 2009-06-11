@@ -1,8 +1,5 @@
 ---
 
-- thread handling of batch_put - etc.
-
-- Dropbox.count is broken (quoting)
 
 - detect arity of selects better (id vs list of ids)
 
@@ -13,6 +10,10 @@
 - hooks - before_save/etc
 
 - nuke listify usage
+
+- thread handling of batch_put - etc.
+
+- shit ton of testing to do yo
 
 
 
@@ -42,6 +43,7 @@
 
 
 ---
+- Dropbox.count is broken (quoting)
 - literal support
 - eat right_scale lib
 - BatchPutAttributes

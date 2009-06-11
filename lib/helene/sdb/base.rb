@@ -272,8 +272,8 @@ module Helene
         alias_method 'find', 'select'
 
         def execute_select(*args, &block)
+          log(:debug){ "execute_select <- #{ args.inspect }" }
           options = args.extract_options!.to_options!
-          args.flatten!
 
           accum = options.delete(:accum) || OpenStruct.new(:items => [], :count => 0)
           raw = options.delete(:raw)
@@ -284,7 +284,8 @@ module Helene
             options[:limit] = 2500
           end
 
-          sql = sql_for_select(*[args, options], &block)
+          sql = sql_for_select(*[args, options].flatten, &block)
+          log(:debug){ "execute_select -> #{ sql.inspect }" }
 
           case args.first.to_s
             when "", "all"
@@ -292,14 +293,15 @@ module Helene
             when "first"
               result_arity = 1
             else
+              result_arity = args.first.is_a?(Array) ? -1 : 1
               ids = args.flatten.compact
-              result_arity = args.size == 1 ? 1 : -1
+              result_arity = -1 if ids.size > 1
               if ids.size > 20
                 if block
                   ids.each_slice(20){|slice| execute_select(*[slice, options], &block)}
                 else
                   # records = ids.threadify(:each_slice, 20){|slice| execute_select(*[slice, options])}.flatten
-                  records = ids.each_slice(20){|slice| execute_select(*[slice, options])}.flatten
+                  records = ids.each_slice(20){|slice| execute_select(*[slice, options].flatten)}.flatten
                   return(limit ? records[0,limit] : records)
                 end
               end
@@ -308,6 +310,7 @@ module Helene
           result = connection.select(sql, @next_token)
           @next_token = result[:next_token]
           items = result[:items]
+
 
           result[:items].each do |hash|
             item =
@@ -354,6 +357,7 @@ module Helene
         def sql_for_select(*args)
           options = args.extract_options!.to_options!
           args.flatten!
+
           which =
             case args.first.to_s
               when "", "all"
@@ -365,7 +369,6 @@ module Helene
                 options[:ids] = args.flatten.compact
                 args.size == 1 ? :id : :ids
             end
-
 
           select = sql_select_list_for(options[:select])
 
@@ -393,8 +396,6 @@ module Helene
 
 
           sql = "SELECT #{ select } FROM #{ from } #{ conditions } #{ order } #{ limit }".strip
-        ensure
-          log(:debug){ "sql_for(#{ options.inspect }) #=> #{ sql.inspect }" }
         end
 
         def sql_select_list_for(*list)
@@ -524,6 +525,7 @@ module Helene
         alias_method 'escape', 'escape_value'
 
         def escape_attribute(value)
+        return value
           return value if Literal?(value)
           "`#{ value.gsub(%r/`/, '``') }`"
         end

@@ -52,11 +52,10 @@ require 'acf/right_acf_interface'
 
 module RightAws #:nodoc:
   module VERSION #:nodoc:
-    RightAws::VERSION::MAJOR = 1
-    RightAws::VERSION::MINOR = 10
-    RightAws::VERSION::TINY  = 0
-
-    STRING = [MAJOR, MINOR, TINY].join('.')
+    RightAws::VERSION::MAJOR = 1 unless defined?(RightAws::VERSION::MAJOR)
+    RightAws::VERSION::MINOR = 10 unless defined?(RightAws::VERSION::MINOR)
+    RightAws::VERSION::TINY  = 0 unless defined?(RightAws::VERSION::TINY)
+    STRING = [MAJOR, MINOR, TINY].join('.') unless defined?(RightAws::VERSION::STRING)
   end
 end
 
