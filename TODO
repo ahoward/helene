@@ -25,6 +25,8 @@
 
 - test @next_token stuff a bunch
 
+- detect arity of selects better (id vs list of ids)
+
 
 ---
 - quoting of sort options

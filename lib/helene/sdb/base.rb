@@ -254,7 +254,6 @@ module Helene
 # this won't work?? ;-(
           limit = Integer(options[:limit]) if options.has_key?(:limit)
           if limit and limit > 2500
-            #options[:_limit] = options.delete(:limit)
             options[:limit] = 2500
           end
 
@@ -269,13 +268,12 @@ module Helene
               ids = listify(args)
               result_arity = args.size == 1 ? 1 : -1
               if ids.size > 20
-                results =
-                  ids.threadify(:each_slice, 20) do |slice|
-                    sql = sql_for_select(slice, options)
-                    execute_select(sql, slice)
-                  end
-                results.flatten!
-                limit ? results[0,limit] : results
+                if block
+                  ids.each_slice(20){|slice| execute_select(*[slice, options], &block)}
+                else
+                  records = ids.threadify(:each_slice, 20){|slice| execute_select(*[slice, options])}.flatten
+                  return(limit ? records[0,limit] : records)
+                end
               end
           end
 
@@ -507,8 +505,8 @@ module Helene
           [ pair.first.to_s.sub(%r/^id$/, 'ItemName()'), pair.last.to_s ]
         end
 
-        def [](id)
-          select(id)
+        def [](*ids)
+          select(*ids)
         end
 
         def reload_if_exists(record)

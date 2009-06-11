@@ -24,12 +24,12 @@ namespace 'test' do
         sdb/base
       ].each do |basename|
 
-        test_loader('test/integration/begin.rb', :require_auth => true)
+        #test_loader('test/integration/begin.rb', :require_auth => true)
 
         begin
           test_loader "test/integration/#{ basename }.rb", :require_auth => true
         ensure
-          test_loader('test/integration/ensure.rb', :require_auth => true)
+          #test_loader('test/integration/ensure.rb', :require_auth => true)
         end
       end
 

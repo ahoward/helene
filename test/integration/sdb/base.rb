@@ -52,16 +52,14 @@ testing Helene::Sdb::Base do
       end
     end
 
-=begin
-    should 'be able to find by > 20 ids (using threadify)' do
+    should 'be able to find by > 20 ids' do
       a = assert{ @a.create! }
       ids = Array.new(42){ a.id }
-      eventually_assert('find by > 20 ids') do
+      #eventually_assert('find by > 20 ids') do
         list = assert{ @a.find(ids) }
         list and list.all?{|found| found.id == a.id}
-      end
+      #end
     end
-=end
   end
 =begin
 
