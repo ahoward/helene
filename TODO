@@ -21,6 +21,10 @@
   - Base.batch_put (25 at a time)
   - Base.batch_save
 
+- reconsider virtual loading stuff
+
+- test @next_token stuff a bunch
+
 
 ---
 - quoting of sort options

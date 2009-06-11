@@ -147,14 +147,27 @@ module Helene
           args.flatten!
           options = args.extract_options!.to_options!
           records = args
-          items = {}
+          to_put = []
+
           records.each do |record|
             record.prepare_for_update
             item_name = record.id
             sdb_attributes = record.ruby_to_sdb
-            items.update item_name => sdb_attributes
+            to_put.push [item_name, sdb_attributes]
           end
-          connection.batch_put_attributes(domain, items, options)
+
+          results =
+            to_put.threadify(:each_slice, 25) do |slice|
+              items = Hash[*slice.to_a.flatten]
+              connection.batch_put_attributes(domain, items, options)
+            end.flatten
+
+          records.each do |record|
+            record.virtually_load(record.ruby_to_sdb)
+            record.mark_as_old!
+          end
+
+          records
         end
 
       # prepare attributes from sdb for ruby
@@ -241,7 +254,7 @@ module Helene
 # this won't work?? ;-(
           limit = Integer(options[:limit]) if options.has_key?(:limit)
           if limit and limit > 2500
-            options[:_limit] = options.delete(:limit)
+            #options[:_limit] = options.delete(:limit)
             options[:limit] = 2500
           end
 
@@ -284,9 +297,20 @@ module Helene
           end
 
           if @next_token
-            unless(limit and accum.count >= limit)
-              raise NotImplementedError
-              execute_select(sql, [], options.merge(:next_token => @next_token, :raw => raw, :accum => accum), &block) # recurse
+            if limit.nil?
+              recurse = [
+                args,
+                options.merge(:next_token => @next_token, :raw => raw, :accum => accum)
+              ].flatten
+              execute_select(*recurse, &block)
+            else
+              if accum.count < limit
+                recurse = [
+                  args,
+                  options.merge(:next_token => @next_token, :raw => raw, :accum => accum, :limit => (limit - accum.count))
+                ].flatten
+                execute_select(*recurse, &block)
+              end
             end
           end
 

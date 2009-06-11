@@ -28,13 +28,21 @@ namespace 'test' do
 
         begin
           test_loader "test/integration/#{ basename }.rb", :require_auth => true
-        rescue Object
+        ensure
           test_loader('test/integration/ensure.rb', :require_auth => true)
-          raise
         end
       end
 
       # test_loader 'test/integration/teardown.rb'
+    end
+
+    namespace 'integration' do
+      task 'setup' do
+        test_loader 'test/integration/setup.rb', :require_auth => true
+      end
+      task 'teardown' do
+        test_loader 'test/integration/teardown.rb', :require_auth => true
+      end
     end
 end
 

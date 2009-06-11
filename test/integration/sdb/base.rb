@@ -52,6 +52,7 @@ testing Helene::Sdb::Base do
       end
     end
 
+=begin
     should 'be able to find by > 20 ids (using threadify)' do
       a = assert{ @a.create! }
       ids = Array.new(42){ a.id }
@@ -60,11 +61,14 @@ testing Helene::Sdb::Base do
         list and list.all?{|found| found.id == a.id}
       end
     end
+=end
   end
+=begin
 
   context 'magic fields' do
     
   end
+=end
 
 =begin
   context 'limit > 2500' do
