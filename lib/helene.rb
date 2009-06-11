@@ -1,7 +1,7 @@
 module Helene
 # version
 #
-  Helene::VERSION = '0.0.0'
+  Helene::VERSION = '0.0.0' unless defined?(Helene::VERSION)
   def Helene.version() Helene::VERSION end
 
 # ruby built-ins
@@ -30,13 +30,21 @@ module Helene
 
 # helene load support
 #
+  def Helene.lib
+    @lib = Pathname.new(__FILE__).realpath.to_s
+  end
+
   def Helene.libdir(*args)
-    @libdir ||= Pathname.new(__FILE__).realpath.dirname
+    @libdir ||= File.dirname(lib)
     if args.empty?
       @libdir
     else
       File.join(@libdir, *args.flatten.compact.map{|arg| arg.to_s})
     end
+  end
+
+  def Helene.reload!
+    Kernel.load lib
   end
 
   def Helene.load(lib)

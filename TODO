@@ -1,19 +1,29 @@
- 
-. handle != sanely
+--- 
+- handle != sanely
 
-. handle [] in queries (every() bit)
+- handle [] in queries (every() bit)
 
-. belongs_to
+- belongs_to
 
-. hooks - before_save/etc
+- hooks - before_save/etc
 
-. handle delete_attributes(:list => nil)
+- handle delete_attributes(:list => nil)
 
-. handle virtual loading (optionally)
+- handle virtual loading (optionally)
 
-. handle virtual deletion (deleted_at)
+- handle virtual deletion (deleted_at)
 
-. NotFound error for find by id
+- NotFound error for find by id
 
-. escape attribute/domain names with backtick
+- test limit > 2500
+
+- BatchPutAttributes
+  - Base.batch_put (25 at a time)
+  - Base.batch_save
+
+
+---
+- quoting of sort options
+- escape attribute/domain names with backtick
+- limit > 2500
 

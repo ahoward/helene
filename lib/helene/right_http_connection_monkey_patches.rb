@@ -26,10 +26,10 @@ module Rightscale
       end
     end
 
-    Initialize = instance_method(:initialize)
+    @@initialize = instance_method(:initialize)
 
     def initialize(*args, &block)
-      Initialize.bind(self).call(*args, &block)
+      @@initialize.bind(self).call(*args, &block)
     ensure
       @logger = Helene.logger
     end

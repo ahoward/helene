@@ -157,9 +157,6 @@ module Helene
       end
       
       def put_attributes(domain_name, item_name, attributes, replace = false)
-#p :put_attributes => attributes
-#p :replace => replace 
-#puts
         params = { 'DomainName' => domain_name,
                    'ItemName'   => item_name }.merge(pack_put_attributes(attributes, :replace => replace))
         link = generate_request("PutAttributes", params)
@@ -170,7 +167,7 @@ module Helene
 
       def pack_put_attributes(attributes, options)
         replace = (options.delete(:replace) || false)
-        replace = true
+        prefix = options.delete(:prefix)
 
         result = {}
 
@@ -183,31 +180,47 @@ module Helene
             if value.is_a?(Array)
               values = Array(value).flatten
 
-              result["Attribute.#{idx}.Replace"] = 'true' if replace
-              result["Attribute.#{idx}.Name"]  = attribute
-              result["Attribute.#{idx}.Value"] = '[]'
+              result["#{prefix}Attribute.#{idx}.Replace"] = 'true' if replace
+              result["#{prefix}Attribute.#{idx}.Name"]  = attribute
+              result["#{prefix}Attribute.#{idx}.Value"] = '[]'
               idx += 1
 
               values.each do |value|
-                result["Attribute.#{idx}.Replace"] = 'true' if replace
-                result["Attribute.#{idx}.Name"]  = attribute
-                result["Attribute.#{idx}.Value"] = ruby_to_sdb(value)
+                result["#{prefix}Attribute.#{idx}.Replace"] = 'true' if replace
+                result["#{prefix}Attribute.#{idx}.Name"]  = attribute
+                result["#{prefix}Attribute.#{idx}.Value"] = ruby_to_sdb(value)
                 idx += 1
               end
             else
-              result["Attribute.#{idx}.Replace"] = 'true' if replace
-              result["Attribute.#{idx}.Name"] = attribute
-              result["Attribute.#{idx}.Value"] = ruby_to_sdb(value)
+              result["#{prefix}Attribute.#{idx}.Replace"] = 'true' if replace
+              result["#{prefix}Attribute.#{idx}.Name"] = attribute
+              result["#{prefix}Attribute.#{idx}.Value"] = ruby_to_sdb(value)
               idx += 1
               #(1..255).each{|i| result["Attribute.#{i}.Replace"] = 'true' } if replace
             end
           end
         end
 
-#puts result.to_a.sort.map{|a| a.inspect}
-#puts
-#puts
+        result
+      end
 
+      def batch_put_attributes(domain_name, items, replace = false)
+        raise ArgumentError if items.empty?
+        params = { 'DomainName' => domain_name }.merge(pack_batch_put_attributes(items, :replace => replace))
+        link = generate_request("BatchPutAttributes", params)
+        request_info( link, QSdbSimpleParser.new )
+      rescue Exception
+        on_exception
+      end
+
+      def pack_batch_put_attributes(items, options)
+        result = {}
+        index = -1
+        items.each do |item_name, attributes|
+          prefix = "Item.#{ index += 1 }."
+          result.update pack_put_attributes(attributes, options.merge(:prefix => prefix))
+          result.update "#{ prefix }ItemName" => item_name
+        end
         result
       end
       

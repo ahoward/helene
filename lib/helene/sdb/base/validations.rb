@@ -183,8 +183,8 @@ module Helene
             end
           end
 
-          NUMBER_RE = /^\d*\.{0,1}\d+$/
-          INTEGER_RE = /\A[+-]?\d+\Z/
+          NUMBER_RE = /^\d*\.{0,1}\d+$/ unless defined?(NUMBER_RE)
+          INTEGER_RE = /\A[+-]?\d+\Z/ unless defined?(INTEGER_RE)
 
           def validates_numericality_of(*atts)
             opts = {

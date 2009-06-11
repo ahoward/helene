@@ -132,6 +132,31 @@ module Helene
           record
         end
 
+      # batch create/update
+      #
+        def save_without_validation(*records)
+          prepare_for_update
+          sdb_attributes = ruby_to_sdb
+          connection.put_attributes(domain, id, sdb_attributes, :replace)
+          virtually_load(sdb_attributes)
+          mark_as_old!
+          errors.empty?
+        end
+
+        def batch_put(*args)
+          args.flatten!
+          options = args.extract_options!.to_options!
+          records = args
+          items = {}
+          records.each do |record|
+            record.prepare_for_update
+            item_name = record.id
+            sdb_attributes = record.ruby_to_sdb
+            items.update item_name => sdb_attributes
+          end
+          connection.batch_put_attributes(domain, items, options)
+        end
+
       # prepare attributes from sdb for ruby
       #
         def sdb_to_ruby(attributes = {})
@@ -200,32 +225,33 @@ module Helene
         attr_accessor :next_token
 
         def select(*args, &block)
-          sql = sql_for_select(*args, &block)
-          execute_select(sql, *args, &block)
+          execute_select(*args, &block)
         end
         alias_method 'find', 'select'
 
-        def execute_select(sql, *args, &block)
+        def execute_select(*args, &block)
           options = args.extract_options!.to_options!
           args.flatten!
 
           accum = options.delete(:accum) || OpenStruct.new(:items => [], :count => 0)
           raw = options.delete(:raw)
           @next_token = options.delete(:next_token)
-          limit = Integer(options[:limit]) if options.has_key?(:limit)
 
+# TODO - this needs to be forced to 2500 and more gotten in the this case -
+# this won't work?? ;-(
+          limit = Integer(options[:limit]) if options.has_key?(:limit)
           if limit and limit > 2500
             options[:_limit] = options.delete(:limit)
+            options[:limit] = 2500
           end
+
+          sql = sql_for_select(*[args, options], &block)
 
           case args.first.to_s
             when "", "all"
               result_arity = -1
-              :all
             when "first"
               result_arity = 1
-              options[:limit] = 1
-              :first
             else
               ids = listify(args)
               result_arity = args.size == 1 ? 1 : -1
@@ -238,7 +264,6 @@ module Helene
                 results.flatten!
                 limit ? results[0,limit] : results
               end
-              options[:ids] = ids
           end
 
           result = connection.select(sql, @next_token)
@@ -291,25 +316,24 @@ module Helene
                 args.size == 1 ? :id : :ids
             end
 
-          select     = sql_select_list_for(options[:select])
-          from       = options[:domain] || options[:from] || domain
-          conditions = !options[:conditions].blank? ? " WHERE #{ sql_conditions_for(options[:conditions]) }"   : ''
-          order      = !options[:order].blank?      ? " ORDER BY #{ sort_options_for(options[:order]).join(' ') }" : ''
-          limit      = ''
-          ids        = options[:ids] || []
 
+          select = sql_select_list_for(options[:select])
+
+          from = options[:domain] || options[:from] || domain
           from = escape_domain(from)
 
-          [:_limit, :limit].each do |key|
-            if options.has_key?(key)
-              limit = " LIMIT #{ options[key] }"
-              break
-            end
-          end
+          conditions = !options[:conditions].blank? ? " WHERE #{ sql_conditions_for(options[:conditions]) }"   : ''
+
+          order      = !options[:order].blank? ?
+            " ORDER BY #{ sort_by, sort_order = sort_options_for(options[:order]); [escape_attribute(sort_by), sort_order].join(' ') }" : ''
+
+          limit      = !options[:limit].blank? ? " LIMIT #{ options[:limit] }" : ''
+
+          ids        = options[:ids] || []
 
           unless order.blank? # you must have a predicate for any attribute sorted on...
             sort_by, sort_order = sort_options_for(options[:order])
-            conditions << (conditions.blank? ? " WHERE " : " AND ") << "(#{sort_by} IS NOT NULL)"
+            conditions << (conditions.blank? ? " WHERE " : " AND ") << "(#{ escape_attribute(sort_by) } IS NOT NULL)"
           end
 
           unless ids.blank?
@@ -529,6 +553,7 @@ module Helene
       alias_method 'new?', 'new_record'
       attr_accessor 'attributes'
       attr_accessor 'attributes_before_sdb_to_ruby'
+      alias_method 'item_name', 'id'
 
       class Attributes < ::HashWithIndifferentAccess
         def Attributes.for(arg)

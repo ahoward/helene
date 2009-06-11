@@ -12,58 +12,51 @@ testing Helene::Sdb::Base do
 
 
   context 'saving' do
-    def setup
-      a = model(:a)
-      p a
-      p a.respond_to?(:foo)
-    end
-
-    class A < Helene::Sdb::Base
-    end
-    class B < Helene::Sdb::Base
-      attribute :foo, :null => false
+    setup do
+      @a = model(:a)
+      @b = model(:b) do
+        attribute :foo, :null => false
+      end
     end
 
     should 'be able to save a valid object' do
-      assert{ A.new.save == true }
-      assert{ B.new(:foo=>'foo').save == true }
+      assert{ @a.new.save == true }
+      assert{ @b.new(:foo=>'foo').save == true }
     end
 
     should 'not be able to save an invalid object' do
-      assert{ B.new(:foo=>nil).save == false }
+      assert{ @b.new(:foo=>nil).save == false }
     end
   end
 
   context 'selecting' do
-    class A < Helene::Sdb::Base
-    end
-    class B < Helene::Sdb::Base
-    end
-    class C < Helene::Sdb::Base
+    setup do
+      @a = model(:a)
+      @b = model(:b)
+      @c = model(:c)
     end
 
     should 'be able to find by id' do
-      a = assert{ A.create! }
+      a = assert{ @a.create! }
       eventually_assert('find by id') do
-        found = A.find(a.id)
+        found = @a.find(a.id)
         found and found.id == a.id
       end
     end
 
     should 'be able to find by many ids' do
-      a = assert{ A.create! }
+      a = assert{ @a.create! }
       eventually_assert('find by id') do
-        list = A.find([a.id, a.id])
+        list = @a.find([a.id, a.id])
         list.all?{|found| found.id==a.id}
       end
     end
 
     should 'be able to find by > 20 ids (using threadify)' do
-      a = assert{ A.create! }
+      a = assert{ @a.create! }
       ids = Array.new(42){ a.id }
       eventually_assert('find by > 20 ids') do
-        list = assert{ A.find(ids) }
-        #list = ids.threadify(:each_slice, 20){|slice| A.find(slice) }.flatten
+        list = assert{ @a.find(ids) }
         list and list.all?{|found| found.id == a.id}
       end
     end
@@ -72,6 +65,26 @@ testing Helene::Sdb::Base do
   context 'magic fields' do
     
   end
+
+=begin
+  context 'limit > 2500' do
+    setup do
+      @a = model(:a)
+    end
+
+    should 'get all the results' do
+      n = 2501
+      assert_nothing_raised do
+        Array.new(n).threadify{ @a.create }
+      end
+      sleep 3
+      #eventually_assert do
+        result = @a.find(:all, :limit => n)
+        assert result.size == n
+      #end
+    end
+  end
+=end
 
 
 =begin
