@@ -1,5 +1,21 @@
 module Helene
   module Test
+    module Models
+      def model(name, &block)
+        name = name.to_s
+        @models ||= {}
+        @models[name] ||= Class.new(Helene::Sdb::Base){ domain "helene-test-model-#{ name }" }
+        @models[name].module_eval(&block) if block
+        @models[name]
+      end
+
+      def models
+        ('a' .. 'e').map{|name| model(name)}
+      end
+
+      extend self
+    end
+
     Helper = lambda do
       alias_method '__assert__', 'assert'
 
@@ -37,18 +53,7 @@ module Helene
         false
       end
 
-
-      def model(name, &block)
-        name = name.to_s
-        @models ||= {}
-        @models[name] ||= Class.new(Helene::Sdb::Base){ domain "helene-test-model-#{ name }" }
-        @models[name].module_eval(&block) if block
-        @models[name]
-      end
-
-      def models
-        ('a' .. 'e').map{|name| model(name)}
-      end
+      include Models
     end
   end
 end

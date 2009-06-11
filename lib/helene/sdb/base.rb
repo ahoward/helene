@@ -9,6 +9,7 @@ module Helene
       load 'helene/sdb/base/connection.rb'
       load 'helene/sdb/base/type.rb'
       load 'helene/sdb/base/types.rb'
+      load 'helene/sdb/base/literal.rb'
       load 'helene/sdb/base/validations.rb'
       load 'helene/sdb/base/attributes.rb'
       load 'helene/sdb/base/associations.rb'
@@ -291,7 +292,7 @@ module Helene
             when "first"
               result_arity = 1
             else
-              ids = listify(args)
+              ids = args.flatten.compact
               result_arity = args.size == 1 ? 1 : -1
               if ids.size > 20
                 if block
@@ -361,7 +362,7 @@ module Helene
                 options[:limit] = 1
                 :first
               else
-                options[:ids] = listify(args)
+                options[:ids] = args.flatten.compact
                 args.size == 1 ? :id : :ids
             end
 
@@ -386,7 +387,7 @@ module Helene
           end
 
           unless ids.blank?
-            list = listify(ids).map{|id| escape(id)}.join(',')
+            list = ids.flatten.map{|id| escape(id)}.join(',')
             conditions << (conditions.blank? ? " WHERE " : " AND ") << "ItemName() in (#{ list })"
           end
 
@@ -397,7 +398,7 @@ module Helene
         end
 
         def sql_select_list_for(*list)
-          list = listify(list)
+          list = listify list
           if list.include?('id')
             list[list.index('id')] = 'ItemName()'
           end
@@ -512,6 +513,7 @@ module Helene
         end
 
         def escape_value(value)
+          return value if Literal?(value)
           case value
             when TrueClass, FalseClass
               escape(value.to_s)
@@ -522,10 +524,12 @@ module Helene
         alias_method 'escape', 'escape_value'
 
         def escape_attribute(value)
+          return value if Literal?(value)
           "`#{ value.gsub(%r/`/, '``') }`"
         end
 
         def escape_domain(value)
+          return value if Literal?(value)
           "`#{ value.gsub(%r/`/, '``') }`"
         end
 
@@ -536,7 +540,13 @@ module Helene
         end
 
         def listify(*list)
-          [list].join(',').strip.split(%r/\s*,\s*/)
+          if list.size == 1 and list.first.is_a?(String)
+            list.first.strip.split(%r/\s*,\s*/)
+          else
+            list.flatten!
+            list.compact!
+            list
+          end
         end
 
         def sort_options_for(sort)
@@ -610,7 +620,7 @@ module Helene
                 {:conditions => conditions}
             end
           options = conditions.has_key?(:conditions) ? conditions : {:conditions => conditions}
-          options[:select] = 'count(*)'
+          options[:select] = Literal('count(*)')
           sql = sql_for_select(options)
           result = connection.select(sql, &block)
           Integer(result[:items].first['Domain']['Count'].first) rescue(raise(Error, result.inspect))
