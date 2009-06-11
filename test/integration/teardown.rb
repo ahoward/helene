@@ -6,7 +6,7 @@ if true # test(?e, $test_integration_setup_guard)
     should('nuke domains for all test models') do
       assert_nothing_raised do
         models.each do |model|
-          model.delete_domain
+          model.delete_domain rescue nil
         end
       end
       # assert_nothing_raised{ File.unlink($test_integration_setup_guard) }
