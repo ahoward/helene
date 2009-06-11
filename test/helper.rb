@@ -30,10 +30,24 @@ module Helene
             assert(*args)
             return true
           end
-          STDERR.puts "#{ label.to_s.inspect } not true yet..."
+          STDERR.puts "\n#{ label.to_s.inspect } not true yet..."
           sleep(sleeps[ i % sleeps.size ])
         end
+        STDERR.puts "\n#{ label.to_s.inspect } *never* became true!"
         false
+      end
+
+
+      def model(name, &block)
+        name = name.to_s
+        @models ||= {}
+        @models[name] ||= Class.new(Helene::Sdb::Base){ domain "helene-test-model-#{ name }" }
+        @models[name].module_eval(&block) if block
+        @models[name]
+      end
+
+      def models
+        ('a' .. 'e').map{|name| model(name)}
       end
     end
   end

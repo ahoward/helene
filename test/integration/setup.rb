@@ -11,15 +11,14 @@ else
 
     context('migrating') do
       should('allow some basic models to be migrated') do
-        class A < Helene::Sdb::Base; end
-        class B < Helene::Sdb::Base; end
-        class C < Helene::Sdb::Base; end
-
-        [A, B, C].each do |model|
-          assert_nothing_raised{ model.migrate!  }
-          record = assert{ model.create }
-          assert{ record.delete; true }
+        models.threadify do |model|
+          assert_nothing_raised do
+            model.delete_domain rescue nil
+            model.create_domain
+          end
         end
+        require 'time'
+        open($test_integration_setup_guard, 'w'){|fd| fd.puts Time.now.iso8601(2)}
       end
     end
 

@@ -25,7 +25,8 @@ module Helene
           super
         ensure
           subclass.domain = domain unless self==Base
-          subclasses[subclass.name] = subclass
+          key = subclass.name.blank? ? subclass.inspect : subclass.name
+          subclasses[key] = subclass
         end
         
       # domain/migration methods
@@ -290,12 +291,14 @@ module Helene
                 args.size == 1 ? :id : :ids
             end
 
-          select     = sql_select_for(options[:select])
+          select     = sql_select_list_for(options[:select])
           from       = options[:domain] || options[:from] || domain
           conditions = !options[:conditions].blank? ? " WHERE #{ sql_conditions_for(options[:conditions]) }"   : ''
           order      = !options[:order].blank?      ? " ORDER BY #{ sort_options_for(options[:order]).join(' ') }" : ''
           limit      = ''
           ids        = options[:ids] || []
+
+          from = escape_domain(from)
 
           [:_limit, :limit].each do |key|
             if options.has_key?(key)
@@ -314,12 +317,13 @@ module Helene
             conditions << (conditions.blank? ? " WHERE " : " AND ") << "ItemName() in (#{ list })"
           end
 
+
           sql = "SELECT #{ select } FROM #{ from } #{ conditions } #{ order } #{ limit }".strip
         ensure
           log(:debug){ "sql_for(#{ options.inspect }) #=> #{ sql.inspect }" }
         end
 
-        def sql_select_for(*list)
+        def sql_select_list_for(*list)
           list = listify(list)
           if list.include?('id')
             list[list.index('id')] = 'ItemName()'
@@ -327,7 +331,7 @@ module Helene
           if(list.include?('ItemName()') and list.size > 1)
             raise ArgumentError, "can only select id *or* fields - not both"
           end
-          sql = list.map{|attr| attr =~ %r/id/ ? 'ItemName' : attr}.join(',')
+          sql = list.map{|attr| escape_attribute(attr =~ %r/id/ ? 'ItemName' : attr)}.join(',')
           sql.blank? ? '*' : sql
         end
 
@@ -385,7 +389,7 @@ module Helene
           expression = []
           hash.each do |key, value|
             key = key.to_s
-            lhs = key == 'id' ? 'ItemName()' : key
+            lhs = escape_attribute(key == 'id' ? 'ItemName()' : key)
             rhs =
               if value.is_a?(Array)
                 op = value.first.to_s.strip.downcase.gsub(%r/\s+/, ' ')
@@ -413,7 +417,7 @@ module Helene
           sql = expression.join(' AND ')
         end
 
-        def escape(value)
+        def escape_value(value)
           case value
             when TrueClass, FalseClass
               escape(value.to_s)
@@ -421,11 +425,20 @@ module Helene
               connection.escape(connection.ruby_to_sdb(value))
           end
         end
+        alias_method 'escape', 'escape_value'
+
+        def escape_attribute(value)
+          "`#{ value.gsub(%r/`/, '``') }`"
+        end
+
+        def escape_domain(value)
+          "`#{ value.gsub(%r/`/, '``') }`"
+        end
 
         def to_sdb(attribute, value)
           type = type_for(attribute)
           value = type ? type.ruby_to_sdb(value) : value
-          escape(value)
+          escape_value(value)
         end
 
         def listify(*list)
@@ -721,6 +734,7 @@ module Helene
         attributes['updated_at'] = now
         if new_record?
           attributes['created_at'] ||= now
+          attributes['deleted_at'] = nil
           attributes['transaction_id'] = Transaction.id
         end
       end
@@ -731,6 +745,10 @@ module Helene
 
       def updated_at
         Time.parse(attributes['updated_at'].to_s) unless attributes['updated_at'].blank?
+      end
+
+      def deleted_at
+        Time.parse(attributes['deleted_at'].to_s) unless attributes['deleted_at'].blank?
       end
       
       def to_hash

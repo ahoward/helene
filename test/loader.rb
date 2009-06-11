@@ -32,3 +32,5 @@
 
   require File.join($lib_dir, 'helene')
   require File.join($test_dir, 'helper')
+
+  Helene.logger = $test_log

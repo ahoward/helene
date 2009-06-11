@@ -1,0 +1,19 @@
+ 
+. handle != sanely
+
+. handle [] in queries (every() bit)
+
+. belongs_to
+
+. hooks - before_save/etc
+
+. handle delete_attributes(:list => nil)
+
+. handle virtual loading (optionally)
+
+. handle virtual deletion (deleted_at)
+
+. NotFound error for find by id
+
+. escape attribute/domain names with backtick
+

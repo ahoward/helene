@@ -1,16 +1,23 @@
 testing Helene::Sdb::Base do
 
   context 'creating' do
-    class A < Helene::Sdb::Base
+    setup do
+      @a = model(:a){}
     end
 
     should 'be able to create' do
-      assert{ A.create! }
+      assert{ @a.create! }
     end
   end
 
 
   context 'saving' do
+    def setup
+      a = model(:a)
+      p a
+      p a.respond_to?(:foo)
+    end
+
     class A < Helene::Sdb::Base
     end
     class B < Helene::Sdb::Base
@@ -26,7 +33,6 @@ testing Helene::Sdb::Base do
       assert{ B.new(:foo=>nil).save == false }
     end
   end
-
 
   context 'selecting' do
     class A < Helene::Sdb::Base
@@ -61,6 +67,10 @@ testing Helene::Sdb::Base do
         list and list.all?{|found| found.id == a.id}
       end
     end
+  end
+
+  context 'magic fields' do
+    
   end
 
 
