@@ -1,5 +1,7 @@
 --- 
-- handle != sanely
+- handle != sanely (every())
+
+- detect arity of selects better (id vs list of ids)
 
 - handle [] in queries (every() bit)
 
@@ -25,7 +27,6 @@
 
 - test @next_token stuff a bunch
 
-- detect arity of selects better (id vs list of ids)
 
 
 ---

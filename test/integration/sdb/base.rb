@@ -68,7 +68,6 @@ testing Helene::Sdb::Base do
   end
 =end
 
-=begin
   context 'limit > 2500' do
     setup do
       @a = model(:a)
@@ -77,16 +76,19 @@ testing Helene::Sdb::Base do
     should 'get all the results' do
       n = 2501
       assert_nothing_raised do
-        Array.new(n).threadify{ @a.create }
+        records = Array.new(n){ @a.new }
+        a = Time.now.to_f
+        @a.batch_put records
+        b = Time.now.to_f
+        puts(b - a)
       end
-      sleep 3
+      #sleep 3
       #eventually_assert do
-        result = @a.find(:all, :limit => n)
-        assert result.size == n
+        #result = @a.find(:all, :limit => n)
+        #assert result.size == n
       #end
     end
   end
-=end
 
 
 =begin

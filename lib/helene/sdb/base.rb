@@ -170,6 +170,17 @@ module Helene
           records
         end
 
+        def batch_create(n, options = {}, &block)
+          records = nil
+          Integer(n).times do |i|
+            record = new(options)
+            if block
+              block.arity == 1 ? block.call(record) : block.call(record, i)
+            end
+          end
+          batch_put(record)
+        end
+
       # prepare attributes from sdb for ruby
       #
         def sdb_to_ruby(attributes = {})
