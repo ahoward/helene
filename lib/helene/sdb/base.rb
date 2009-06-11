@@ -146,6 +146,7 @@ module Helene
         def batch_put(*args)
           args.flatten!
           options = args.extract_options!.to_options!
+          replace = options[:replace]
           records = args
           to_put = []
 
@@ -159,7 +160,7 @@ module Helene
           results =
             to_put.threadify(:each_slice, 25) do |slice|
               items = Hash[*slice.to_a.flatten]
-              connection.batch_put_attributes(domain, items, options)
+              connection.batch_put_attributes(domain, items, options, replace)
             end.flatten
 
           records.each do |record|
@@ -168,6 +169,14 @@ module Helene
           end
 
           records
+        end
+
+        def batch_save(*args)
+          args.flatten!
+          options = args.extract_options!.to_options!
+          options[:replace] = true
+          args.push options
+          batch_put(*args)
         end
 
         def batch_create(n, options = {}, &block)
