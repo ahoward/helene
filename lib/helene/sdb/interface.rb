@@ -196,7 +196,6 @@ module Helene
               result["#{prefix}Attribute.#{idx}.Name"] = attribute
               result["#{prefix}Attribute.#{idx}.Value"] = ruby_to_sdb(value)
               idx += 1
-              #(1..255).each{|i| result["Attribute.#{i}.Replace"] = 'true' } if replace
             end
           end
         end

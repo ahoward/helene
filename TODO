@@ -1,17 +1,21 @@
---- 
-- handle != sanely (every())
+---
+- deleted_at handling
+- Tansaction.time
 
 - detect arity of selects better (id vs list of ids)
 
-- handle [] in queries (every() bit)
-
 - belongs_to
+
+- bootstrap config info better (config file for instance)
+
 
 - hooks - before_save/etc
 
 - handle delete_attributes(:list => nil)
 
 - handle virtual loading (optionally)
+
+- impl virtual deletion
 
 - handle virtual deletion (deleted_at)
 
@@ -22,6 +26,8 @@
 - BatchPutAttributes
   - Base.batch_put (25 at a time)
   - Base.batch_save
+  - Base.batch_create
+  - Base.batch_delete?
 
 - reconsider virtual loading stuff
 
@@ -30,6 +36,8 @@
 
 
 ---
+- handle != sanely (every())
+- handle [] in queries (every() bit)
 - quoting of sort options
 - escape attribute/domain names with backtick
 - limit > 2500

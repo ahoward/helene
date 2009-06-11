@@ -160,7 +160,7 @@ module Helene
           results =
             to_put.threadify(:each_slice, 25) do |slice|
               items = Hash[*slice.to_a.flatten]
-              connection.batch_put_attributes(domain, items, options, replace)
+              connection.batch_put_attributes(domain, items, options.update(:replace => replace))
             end.flatten
 
           records.each do |record|
@@ -453,12 +453,31 @@ module Helene
         def sql_conditions_from_hash(hash)
           return '' if hash.blank?
           expression = []
+          every_re = %r/every\s*\(\s*([^)])\s*\)/io
+
           hash.each do |key, value|
             key = key.to_s
-            lhs = escape_attribute(key == 'id' ? 'ItemName()' : key)
+
+            m = every_re.match(key)
+            if m
+              key = m[1]
+              every = true
+            else
+              every = false
+            end
+
+            lhs = escape_attribute(key =~ %r/^\s*id\s*$/oi ? 'ItemName()' : key)
+
             rhs =
               if value.is_a?(Array)
-                op = value.first.to_s.strip.downcase.gsub(%r/\s+/, ' ')
+                first = value.first.to_s.strip.downcase.gsub(%r/\s+/, ' ')
+                if(first.delete('() ') == 'every')
+                  every = value.shift
+                  op = value.first.to_s.strip.downcase.gsub(%r/\s+/, ' ')
+                else
+                  every = false 
+                  op = first
+                end
                 case op
                   when '=', '!=', '>', '>=', '<', '<=', 'like', 'not like'
                     list = value[1..-1].flatten.map{|val| to_sdb(key, val)}
@@ -478,6 +497,8 @@ module Helene
               else
                 "= #{ to_sdb(key, value) }"
               end
+
+            lhs = "every(#{ lhs })" if every
             expression << "#{ lhs } #{ rhs }"
           end
           sql = expression.join(' AND ')
@@ -701,19 +722,6 @@ module Helene
         self.attributes.replace(sdb_to_ruby(sdb_attributes))
       end
 
-      def mark_as_old!
-        self.new_record = false
-      end
-
-      def put_attributes(attributes)
-        check_id!
-        prepare_for_update
-        sdb_attributes = ruby_to_sdb(attributes)
-        connection.put_attributes(domain, id, sdb_attributes)
-        virtually_put(sdb_attributes)
-        self
-      end
-
       def virtually_put(sdb_attributes)
         a = sdb_attributes
         b = ruby_to_sdb
@@ -726,6 +734,19 @@ module Helene
           end
         end
         virtually_load(b)
+      end
+
+      def mark_as_old!
+        self.new_record = false
+      end
+
+      def put_attributes(attributes)
+        check_id!
+        prepare_for_update
+        sdb_attributes = ruby_to_sdb(attributes)
+        connection.put_attributes(domain, id, sdb_attributes)
+        virtually_put(sdb_attributes)
+        self
       end
 
       def save_attributes(attributes = self.attributes)
@@ -797,10 +818,10 @@ module Helene
       end
       
       def prepare_for_update
-        now = Time.now.utc.iso8601(2)
-        attributes['updated_at'] = now
+        time = Transaction.time
+        attributes['updated_at'] = time
         if new_record?
-          attributes['created_at'] ||= now
+          attributes['created_at'] ||= time
           attributes['deleted_at'] = nil
           attributes['transaction_id'] = Transaction.id
         end
