@@ -686,6 +686,8 @@ module Helene
         end
       end
 
+    # instance methods
+    #
       def initialize(*args)
         options = args.extract_options!.to_options!
         @id = args.size == 1 ? args.shift : generate_id
@@ -710,6 +712,18 @@ module Helene
         @id = generate_id
       end
 
+      def mark_as_old!
+        self.new_record = false
+      end
+
+      def [](attribute)
+        attributes[attribute.to_s]
+      end
+
+      def []=(key, value)
+        attributes[key] = value
+      end
+
       def sdb_to_ruby(attributes = self.attributes)
         klass.sdb_to_ruby(attributes)
       end
@@ -724,14 +738,6 @@ module Helene
 
       def ruby_to_sdb!(attributes = self.attributes)
         self.attributes.replace(ruby_to_sdb(attributes))
-      end
-
-      def [](attribute)
-        attributes[attribute.to_s]
-      end
-
-      def []=(key, value)
-        attributes[key] = value
       end
 
       def reload
@@ -772,7 +778,7 @@ module Helene
         errors.empty?
       end
 
-# TODO - Base.virtual_loading = true
+# TODO - Base.virtual_consistency = true
 #
 
       def virtually_save(ruby_attributes)
@@ -798,8 +804,34 @@ module Helene
         virtually_load(b)
       end
 
-      def mark_as_old!
-        self.new_record = false
+      def virtually_delete(ruby_attributes)
+        ruby_attributes.keys.each do |key|
+          val = ruby_attributes[key]
+          if val.nil?
+            ruby_attributes.delete(key)
+            attributes.delete(key)
+          end
+        end
+
+        current = ruby_to_sdb
+        deleted = ruby_to_sdb(ruby_attributes)
+
+        deleted.each do |key, deleted_val|
+          deleted_val = [ deleted_val ].flatten 
+          current_val = [ current[key] ].flatten
+          deleted_val.each{|val| current_val.delete(val)}
+
+          if current[key].is_a?(Array)
+            current[key] = current_val
+          else
+            if current_val.blank?
+              current[key] = nil
+            else
+              current[key] = current_val
+            end
+          end
+        end
+        virtually_load(current)
       end
 
       def put_attributes(attributes)
@@ -843,8 +875,8 @@ module Helene
         hashes.each{|hash|
           next if hash.empty?
           connection.delete_attributes(domain, id, hash)
+          virtually_delete(hash)
         }
-# TODO - # virtually_delete!
         self
       end
       alias_method 'delete_values', 'delete_attributes'

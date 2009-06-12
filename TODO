@@ -1,15 +1,14 @@
 ---
 
-- deleted_at handling
-  - and ergo batch delete
-
 - belongs_to
 
 - hooks - before_save/etc
 
 - thread handling of batch_put - etc.
 
-- shit ton of testing to do yo
+- gut http connection impl?
+
+- shit ton of testing to do yo.
 
 
 
@@ -40,6 +39,8 @@
 
 
 ---
+- deleted_at handling
+  - and ergo batch delete
 - nuke listify usage
 - detect arity of selects better (id vs list of ids)
 - Dropbox.count is broken (quoting)

@@ -268,9 +268,9 @@ module Helene
           attributes.each do |attribute, value|
             attribute = attribute.to_s
 
-            if value.is_a?(Array)
+            unless value.nil?
               values = Array(value).flatten
-              idx += 1 # skip [] marker value!
+              values.delete('[]')
               values.each do |value|
                 result["Attribute.#{idx}.Name"]  = attribute
                 result["Attribute.#{idx}.Value"] = ruby_to_sdb(value)

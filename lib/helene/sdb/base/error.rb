@@ -2,6 +2,7 @@ module Helene
   module Sdb
     class Base
       class Error < Helene::Error; end
+      class RecordNotFound < Error; end
 
       class << Base
         def error!(message)
