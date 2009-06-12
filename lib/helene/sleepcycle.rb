@@ -1,7 +1,7 @@
 module Helene
   class SleepCycle < ::Array
-    Min = 0.01
-    Max = 1.28
+    Min = 0.01 unless defined?(Min)
+    Max = 1.28 unless defined?(Max)
 
     attr_accessor :min
     attr_accessor :max

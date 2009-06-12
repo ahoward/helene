@@ -28,8 +28,29 @@ module Helene
           super
         ensure
           subclass.domain = domain unless self==Base
+          subclass.perform_virtual_consistency = perform_virtual_consistency
           key = subclass.name.blank? ? subclass.inspect : subclass.name
           subclasses[key] = subclass
+        end
+
+      # virtual consistency
+      #
+        def perform_virtual_consistency(*value)
+          @perform_virtual_consistency = true unless defined?(@perform_virtual_consistency)
+          @perform_virtual_consistency = !!value.first unless value.empty?
+          @perform_virtual_consistency
+        end
+
+        def perform_virtual_consistency?()
+          perform_virtual_consistency()
+        end
+
+        def perform_virtual_consistency=(value)
+          perform_virtual_consistency(value)
+        end
+
+        def perform_virtual_consistency!()
+          perform_virtual_consistency(true)
         end
         
       # domain/migration methods
@@ -889,16 +910,39 @@ module Helene
         delete
       end
 
+    # virtual consistency
+    #
+      def perform_virtual_consistency(*value)
+        @perform_virtual_consistency = klass.perform_virtual_consistency unless defined?(@perform_virtual_consistency)
+        @perform_virtual_consistency = !!value.first unless value.empty?
+        @perform_virtual_consistency
+      end
+
+      def perform_virtual_consistency?()
+        perform_virtual_consistency()
+      end
+
+      def perform_virtual_consistency=(value)
+        perform_virtual_consistency(value)
+      end
+
+      def perform_virtual_consistency!()
+        perform_virtual_consistency(true)
+      end
+
+      def virtually_load(sdb_attributes)
+        #return unless perform_virtual_consistency?
+        self.attributes.replace(sdb_to_ruby(sdb_attributes))
+      end
+
       def virtually_save(ruby_attributes)
+        #return unless perform_virtual_consistency?
         sdb_attributes = ruby_to_sdb(ruby_attributes)
         virtually_load(sdb_attributes)
       end
 
-      def virtually_load(sdb_attributes)
-        self.attributes.replace(sdb_to_ruby(sdb_attributes))
-      end
-
       def virtually_put(sdb_attributes)
+        #return unless perform_virtual_consistency?
         a = sdb_attributes
         b = ruby_to_sdb
         (a.keys + b.keys).uniq.each do |key|
@@ -913,6 +957,7 @@ module Helene
       end
 
       def virtually_delete(ruby_attributes)
+        #return unless perform_virtual_consistency?
         ruby_attributes.keys.each do |key|
           val = ruby_attributes[key]
           if val.nil?

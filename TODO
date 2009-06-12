@@ -1,8 +1,5 @@
 ---
 
-- general attempt support
-  - sleepcycle backoff
-
 
 - belongs_to
 
@@ -24,10 +21,14 @@
 
 - NotFound error for find by id
 
+- build a 'better set' class (on top of Array) for returning helene return
+  vals
 
 
 
 ---
+- general attempt support
+  - sleepcycle backoff
 - literal support should avoid type casting?
 - test @next_token stuff a bunch
 - reconsider virtual loading stuff

@@ -1,8 +1,8 @@
 module Helene
   module Sdb
     module Sentinel
-      Nil = 'nil'
-      Set = '[]'
+      Nil = 'nil' unless defined?(Sentinel::Nil)
+      Set = '[]' unless defined?(Sentinel::Set)
 
       class << Sentinel
         def Nil() Nil end
