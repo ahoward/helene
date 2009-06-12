@@ -63,9 +63,9 @@ module Helene
             type = new(name, &block)
             list[type.name] = type
 
-            ["list_of_#{ name.singularize }", "list_of_#{ name.pluralize }"].uniq.each do |list_of_name|
-              list_of_type =
-                new(list_of_name) do
+            ["set_of_#{ name.singularize }", "set_of_#{ name.pluralize }"].uniq.each do |set_of_name|
+              set_of_type =
+                new(set_of_name) do
                   ruby_to_sdb do |values|
                     values = Array(values).flatten
                     values.each{|value| type.ruby_to_sdb(value)}
@@ -75,7 +75,7 @@ module Helene
                     values.each{|value| type.sdb_to_ruby(value)}
                   end
                 end
-              list[list_of_type.name] = list_of_type
+              list[set_of_type.name] = set_of_type
             end
 
             type

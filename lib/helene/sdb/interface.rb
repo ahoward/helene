@@ -197,7 +197,7 @@ module Helene
 
               result["#{prefix}Attribute.#{idx}.Replace"] = 'true' if replace
               result["#{prefix}Attribute.#{idx}.Name"]  = attribute
-              result["#{prefix}Attribute.#{idx}.Value"] = Sentinel.Array
+              result["#{prefix}Attribute.#{idx}.Value"] = Sentinel.Set
               idx += 1
 
               values.each do |value|
@@ -322,9 +322,9 @@ module Helene
           item.each do |key, attributes|
             attributes.keys.each do |name|
               values = attributes[name]
-              array = values.delete(Sentinel.array)
+              set = values.delete(Sentinel.Set)
               attributes[name] =
-                if array
+                if set
                   values.map{|value| sdb_to_ruby(value)}
                 else
                   sdb_to_ruby(values.first)

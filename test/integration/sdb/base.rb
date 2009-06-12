@@ -90,7 +90,7 @@ testing Helene::Sdb::Base do
     setup do
       @a = model(:a) do
         attribute :x, :string
-        attribute :y, :list_of_string
+        attribute :y, :set_of_string
       end
     end
 

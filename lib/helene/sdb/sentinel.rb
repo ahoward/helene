@@ -2,13 +2,13 @@ module Helene
   module Sdb
     module Sentinel
       Nil = 'nil'
-      Array = '[]'
+      Set = '[]'
 
       class << Sentinel
         def Nil() Nil end
         def nil() Nil end
-        def Array() Array end
-        def array() Array end
+        def Set() Set end
+        def set() Set end
       end
     end
   end
