@@ -60,6 +60,10 @@ module Helene
             super(&block)
           end
           
+          def count
+            size
+          end
+          
           def on(att)
             self[att]
           end
