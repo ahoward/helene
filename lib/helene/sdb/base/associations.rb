@@ -10,6 +10,7 @@ module Helene
           __
         end
 
+
         attr :base
         attr :name
         attr :options

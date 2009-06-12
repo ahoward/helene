@@ -1,19 +1,16 @@
 ---
 
-
-- detect arity of selects better (id vs list of ids)
+- deleted_at handling
+  - and ergo batch delete
 
 - belongs_to
 
-- deleted_at handling
-
 - hooks - before_save/etc
-
-- nuke listify usage
 
 - thread handling of batch_put - etc.
 
 - shit ton of testing to do yo
+
 
 
 
@@ -43,6 +40,8 @@
 
 
 ---
+- nuke listify usage
+- detect arity of selects better (id vs list of ids)
 - Dropbox.count is broken (quoting)
 - literal support
 - eat right_scale lib

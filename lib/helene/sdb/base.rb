@@ -199,6 +199,16 @@ module Helene
           batch_put(record)
         end
 
+        def batch_delete(*args)
+          args.flatten!
+          options = args.extract_options!.to_options!
+          records = args.compact
+          records.each{|record| record.delete}
+          args = records
+          args.push options
+          batch_put(*args)
+        end
+
       # prepare attributes from sdb for ruby
       #
         def sdb_to_ruby(attributes = {})
@@ -358,43 +368,70 @@ module Helene
           options = args.extract_options!.to_options!
           args.flatten!
 
-          which =
-            case args.first.to_s
-              when "", "all"
-                :all
-              when "first"
-                options[:limit] = 1
-                :first
-              else
-                options[:ids] = args.flatten.compact
-                args.size == 1 ? :id : :ids
-            end
+        # arity
+        #
+          case args.first.to_s
+            when "", "all"
+              :all
+            when "first"
+              options[:limit] = 1
+              :first
+            else
+              options[:ids] = args.flatten.compact
+              args.size == 1 ? :id : :ids
+          end
 
+        # do you want to show deleted records?
+        #
+          want_deleted = options.has_key?(:deleted) ? options.delete(:deleted) : false
+
+        # build select
+        #
           select = sql_select_list_for(options[:select])
 
+        # build from
+        #
           from = options[:domain] || options[:from] || domain
           from = escape_domain(from)
 
-          conditions = !options[:conditions].blank? ? " WHERE #{ sql_conditions_for(options[:conditions]) }"   : ''
+        # build conditions
+        #
+          conditions = (options[:conditions] || {}).to_options!
+          conditions = !conditions.blank? ? " WHERE #{ sql_conditions_for(options[:conditions]) }"   : ''
 
+        # build order
+        #
           order      = !options[:order].blank? ?
             " ORDER BY #{ sort_by, sort_order = sort_options_for(options[:order]); [escape_attribute(sort_by), sort_order].join(' ') }" : ''
 
+        # build limit
+        #
           limit      = !options[:limit].blank? ? " LIMIT #{ options[:limit] }" : ''
 
+        # build ids
+        #
           ids        = options[:ids] || []
 
+        # monkey patch conditions
+        #
           unless order.blank? # you must have a predicate for any attribute sorted on...
             sort_by, sort_order = sort_options_for(options[:order])
             conditions << (conditions.blank? ? " WHERE " : " AND ") << "(#{ escape_attribute(sort_by) } IS NOT NULL)"
           end
-
           unless ids.blank?
             list = ids.flatten.map{|id| escape(id)}.join(',')
             conditions << (conditions.blank? ? " WHERE " : " AND ") << "ItemName() in (#{ list })"
           end
+          if want_deleted
+            #conditions << (conditions.blank? ? " WHERE " : " AND ") << "(deleted_at is not null and every(deleted_at) != 'nil')"
+            conditions << (conditions.blank? ? " WHERE " : " AND ") << "`deleted_at`!='nil'"
+          else
+            #conditions << (conditions.blank? ? " WHERE " : " AND ") << "(every(deleted_at) = 'nil' or deleted_at is null)"
+            conditions << (conditions.blank? ? " WHERE " : " AND ") << "`deleted_at`='nil'"
+          end
 
-
+        # sql
+        #
           sql = "SELECT #{ select } FROM #{ from } #{ conditions } #{ order } #{ limit }".strip
         end
 
@@ -812,9 +849,17 @@ module Helene
       end
       alias_method 'delete_values', 'delete_attributes'
 
-      def delete
+      def delete!
         check_id!
         connection.delete_item(domain, id)
+      end
+
+      def delete(options = {})
+        options.to_options!
+        check_id!
+        return delete! if options[:force]
+        attributes['deleted_at'] = Transaction.time
+        update!
       end
 
       def destroy
@@ -855,13 +900,22 @@ module Helene
       def created_at
         Time.parse(attributes['created_at'].to_s) unless attributes['created_at'].blank?
       end
+      def created_at= time
+        attributes['created_at'] = time
+      end
 
       def updated_at
         Time.parse(attributes['updated_at'].to_s) unless attributes['updated_at'].blank?
       end
+      def updated_at= time
+        attributes['updated_at'] = time
+      end
 
       def deleted_at
         Time.parse(attributes['deleted_at'].to_s) unless attributes['deleted_at'].blank?
+      end
+      def deleted_at= time
+        attributes['deleted_at'] = time
       end
       
       def to_hash
