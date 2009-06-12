@@ -34,7 +34,8 @@ module Helene
 
       def eventually_assert(*args, &block)
         options = args.extract_options!.to_options!
-        label = args.shift
+        first = args.shift || caller.first(1)
+        label = "eventually_assert(#{ first.to_s.inspect })"
 
         min = 0.01
         max = 1.28
@@ -42,14 +43,14 @@ module Helene
         m = min
         while m < max; sleeps << m and m *= 2; end
         
+        a = Time.now.to_f
         42.times do |i|
           bool =
             begin
               block.call
             rescue => e
               m, c, b = e.message, e.class, (e.backtrace||{}).join("\n")
-              STDOUT.flush
-              STDERR.print "\n\n#{ m }(#{ c })\n#{ b }\n\n"
+              STDERR.puts "\n#{ m }(#{ c })\n#{ b }"
               false
             end
           if bool
@@ -57,13 +58,13 @@ module Helene
             assert(*args)
             return true
           end
-          STDOUT.flush
-          STDERR.print "\n\n#{ label.to_s.inspect } not true yet...\n\n"
+          STDERR.puts "\n#{ label.to_s } (not true yet...)"
           sleep(sleeps[ i % sleeps.size ])
         end
-        STDOUT.flush
-        STDERR.print "\n\n#{ label.to_s.inspect } *never* became true!\n\n"
-        false
+        b = Time.now.to_f
+        elapsed = b - a
+        STDERR.puts "\n#{ label.to_s } (never became true in #{ elapsed } seconds!)"
+        assert(false, label)
       end
 
       include Models

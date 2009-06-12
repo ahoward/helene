@@ -1,5 +1,7 @@
 ---
 
+- literal support should avoid type casting?
+
 - belongs_to
 
 - hooks - before_save/etc
@@ -10,35 +12,26 @@
 
 - shit ton of testing to do yo.
 
-
-
+- some global box_usage handling.
 
 - bootstrap config info better (config file for instance)
 
 - fucking MT bug in right_http_connection
 
-
-- handle delete_attributes(:list => nil)
-
 - handle virtual loading (optionally)
-
-- impl virtual deletion
-
-- handle virtual deletion (deleted_at)
 
 - NotFound error for find by id
 
-- test limit > 2500
-
-- reconsider virtual loading stuff
-
-- test @next_token stuff a bunch
-
-- literal support should avoid type casting?
 
 
 
 ---
+- test @next_token stuff a bunch
+- reconsider virtual loading stuff
+- test limit > 2500
+- handle virtual deletion (deleted_at)
+- impl virtual deletion
+- handle delete_attributes(:list => nil)
 - deleted_at handling
   - and ergo batch delete
 - nuke listify usage

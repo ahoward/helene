@@ -34,3 +34,6 @@
   require File.join($test_dir, 'helper')
 
   Helene.logger = $test_log
+
+  STDOUT.sync = true
+  STDERR.sync = true

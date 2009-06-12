@@ -570,6 +570,7 @@ module Helene
         end
 
         def to_sdb(attribute, value)
+          # return value if Literal?(value)
           type = type_for(attribute)
           value = type ? type.ruby_to_sdb(value) : value
           escape_value(value)
@@ -871,6 +872,7 @@ module Helene
       def delete!
         check_id!
         connection.delete_item(domain, id)
+        self
       end
 
       def delete(options = {})
