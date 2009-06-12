@@ -1,6 +1,5 @@
 ---
 
-- literal support should avoid type casting?
 
 - belongs_to
 
@@ -26,6 +25,7 @@
 
 
 ---
+- literal support should avoid type casting?
 - test @next_token stuff a bunch
 - reconsider virtual loading stuff
 - test limit > 2500
