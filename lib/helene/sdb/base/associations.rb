@@ -23,7 +23,7 @@ module Helene
           @options = options.to_options!
 
           instance_eval(&block) if block
-          @class_name ||= @name.camelize
+          @class_name ||= options[:class_name] || @name.camelize.singularize
 
           association = self
           @base.module_eval do
@@ -32,7 +32,7 @@ module Helene
         end
 
         def associated_class
-          @associated_class ||= class_name.constanize
+          @associated_class ||= class_name.constantize
         end
 
 
@@ -52,7 +52,8 @@ module Helene
               @foreign_key ||= "#{ @polymorphic }_id"
             end
 
-            @foreign_key ||= "#{ @base.name.downcase }_id"
+            @foreign_key ||= options[:foreign_key] ||
+                             "#{ @base.name.downcase }_id"
 
             @base.module_eval <<-__
               def #{ name }(*args, &block)
@@ -63,13 +64,15 @@ module Helene
                 raise NotImplementedError
               end
             __
+            
+            @lists = Hash.new
           end
 
           def list(record, *args, &block)
-            @list ||= nil
-            forcing = args.options.delopt(:force)
-            @list = nil if forcing
-            @list ||= List.new(record, self, *args, &block)
+            return List.new(record, self, *args, &block) if record.new_record?
+            forcing           =   args.options.delopt(:force)
+            @lists[record.id] =   nil if forcing
+            @lists[record.id] ||= List.new(record, self, *args, &block)
           end
 
           class List < ::Array
