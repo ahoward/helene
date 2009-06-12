@@ -75,6 +75,8 @@ module Helene
     end
     load 'error.rb'
     load 'util.rb'
+    load 'sleepcycle.rb'
+    load 'attempt.rb'
     load 'logging.rb'
     load 'config.rb'
     load 'aws.rb'

@@ -15,6 +15,8 @@ module Helene
       load 'helene/sdb/base/associations.rb'
       load 'helene/sdb/base/transactions.rb'
 
+      include Attempt
+
       class << Base
       # track children
       #
@@ -743,7 +745,7 @@ module Helene
 
       def reload
         check_id!
-        record = klass.select(id)
+        record = attempt{ klass.select(id) || try_again! }
         raise Error, "no record for #{ id.inspect } (yet)" unless record
         replace(record)
         self

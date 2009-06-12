@@ -1,5 +1,5 @@
 module Helene
-  class Error < ::StandardError; end
+  class Error < StandardError; end
   class WTF < Error; end
 
   def Helene.error!(*args, &block)

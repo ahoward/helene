@@ -116,6 +116,13 @@ module Helene
       UUID.timestamp_create().to_s
     end
 
+    def emsg(e)
+      m = e.message
+      c = c.class
+      b = (e.backtrace||[]).join("\n")
+      "#{ m }(#{ c })#{ b }"
+    end
+
     extend self
   end
 end
