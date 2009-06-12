@@ -743,7 +743,7 @@ module Helene
       def reload
         check_id!
         record = klass.select(id)
-        raise Error, "no record for #{ id.inspect }" unless record
+        raise Error, "no record for #{ id.inspect } (yet)" unless record
         replace(record)
         self
       end
@@ -758,15 +758,29 @@ module Helene
         klass.select(id, :raw => true)
       end
 
-      def update(options = {})
-        attributes.update(options)
+      def created_at
+        Time.parse(attributes['created_at'].to_s) unless attributes['created_at'].blank?
+      end
+      def created_at= time
+        attributes['created_at'] = time
       end
 
-      def update!(options = {})
+      def updated_at
+        Time.parse(attributes['updated_at'].to_s) unless attributes['updated_at'].blank?
+      end
+      def updated_at= time
+        attributes['updated_at'] = time
+      end
+
+      def deleted_at
+        Time.parse(attributes['deleted_at'].to_s) unless attributes['deleted_at'].blank?
+      end
+      def deleted_at= time
+        attributes['deleted_at'] = time
+      end
+
+      def update(options = {})
         attributes.update(options)
-        save!
-        virtually_save(attributes)
-        self
       end
 
       def save_without_validation
@@ -778,60 +792,33 @@ module Helene
         errors.empty?
       end
 
-# TODO - Base.virtual_consistency = true
-#
-
-      def virtually_save(ruby_attributes)
-        sdb_attributes = ruby_to_sdb(ruby_attributes)
-        virtually_load(sdb_attributes)
+      def prepare_for_update
+        time = Transaction.time.iso8601(2)
+        attributes['updated_at'] = time
+        if new_record?
+          attributes['created_at'] ||= time
+          attributes['deleted_at'] = nil
+          attributes['transaction_id'] = Transaction.id
+        end
       end
 
-      def virtually_load(sdb_attributes)
-        self.attributes.replace(sdb_to_ruby(sdb_attributes))
+      def save
+        valid? ? save_without_validation : false
       end
 
-      def virtually_put(sdb_attributes)
-        a = sdb_attributes
-        b = ruby_to_sdb
-        (a.keys + b.keys).uniq.each do |key|
-          was_virtually_put = a.has_key?(key)
-          if was_virtually_put
-            val = b[key]
-            val = [val] unless val.is_a?(Array)
-            val += a[key]
-          end
-        end
-        virtually_load(b)
+      def save!
+        valid? ? save_without_validation : errors! 
       end
 
-      def virtually_delete(ruby_attributes)
-        ruby_attributes.keys.each do |key|
-          val = ruby_attributes[key]
-          if val.nil?
-            ruby_attributes.delete(key)
-            attributes.delete(key)
-          end
-        end
+      def errors!
+        raise Validations::Error.new(self, errors.message)
+      end
 
-        current = ruby_to_sdb
-        deleted = ruby_to_sdb(ruby_attributes)
-
-        deleted.each do |key, deleted_val|
-          deleted_val = [ deleted_val ].flatten 
-          current_val = [ current[key] ].flatten
-          deleted_val.each{|val| current_val.delete(val)}
-
-          if current[key].is_a?(Array)
-            current[key] = current_val
-          else
-            if current_val.blank?
-              current[key] = nil
-            else
-              current[key] = current_val
-            end
-          end
-        end
-        virtually_load(current)
+      def update!(options = {})
+        attributes.update(options)
+        save!
+        virtually_save(attributes)
+        self
       end
 
       def put_attributes(attributes)
@@ -898,6 +885,60 @@ module Helene
         delete
       end
 
+      def virtually_save(ruby_attributes)
+        sdb_attributes = ruby_to_sdb(ruby_attributes)
+        virtually_load(sdb_attributes)
+      end
+
+      def virtually_load(sdb_attributes)
+        self.attributes.replace(sdb_to_ruby(sdb_attributes))
+      end
+
+      def virtually_put(sdb_attributes)
+        a = sdb_attributes
+        b = ruby_to_sdb
+        (a.keys + b.keys).uniq.each do |key|
+          was_virtually_put = a.has_key?(key)
+          if was_virtually_put
+            val = b[key]
+            val = [val] unless val.is_a?(Array)
+            val += a[key]
+          end
+        end
+        virtually_load(b)
+      end
+
+      def virtually_delete(ruby_attributes)
+        ruby_attributes.keys.each do |key|
+          val = ruby_attributes[key]
+          if val.nil?
+            ruby_attributes.delete(key)
+            attributes.delete(key)
+          end
+        end
+
+        current = ruby_to_sdb
+        deleted = ruby_to_sdb(ruby_attributes)
+
+        deleted.each do |key, deleted_val|
+          deleted_val = [ deleted_val ].flatten 
+          current_val = [ current[key] ].flatten
+          deleted_val.each{|val| current_val.delete(val)}
+
+          if current[key].is_a?(Array)
+            current[key] = current_val
+          else
+            if current_val.blank?
+              current[key] = nil
+            else
+              current[key] = current_val
+            end
+          end
+        end
+        virtually_load(current)
+      end
+
+
       def stringify(arg)
         case arg
           when Hash
@@ -919,36 +960,6 @@ module Helene
         raise Error.new('No record id') unless id
       end
       
-      def prepare_for_update
-        time = Transaction.time.iso8601(2)
-        attributes['updated_at'] = time
-        if new_record?
-          attributes['created_at'] ||= time
-          attributes['deleted_at'] = nil
-          attributes['transaction_id'] = Transaction.id
-        end
-      end
-
-      def created_at
-        Time.parse(attributes['created_at'].to_s) unless attributes['created_at'].blank?
-      end
-      def created_at= time
-        attributes['created_at'] = time
-      end
-
-      def updated_at
-        Time.parse(attributes['updated_at'].to_s) unless attributes['updated_at'].blank?
-      end
-      def updated_at= time
-        attributes['updated_at'] = time
-      end
-
-      def deleted_at
-        Time.parse(attributes['deleted_at'].to_s) unless attributes['deleted_at'].blank?
-      end
-      def deleted_at= time
-        attributes['deleted_at'] = time
-      end
       
       def to_hash
         raise NotImplementedError

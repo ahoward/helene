@@ -32,7 +32,10 @@ module Helene
         end
       end
 
-      def eventually_assert(label = nil, &block)
+      def eventually_assert(*args, &block)
+        options = args.extract_options!.to_options!
+        label = args.shift
+
         min = 0.01
         max = 1.28
         sleeps = []
@@ -40,16 +43,26 @@ module Helene
         while m < max; sleeps << m and m *= 2; end
         
         42.times do |i|
-          bool = block.call
+          bool =
+            begin
+              block.call
+            rescue => e
+              m, c, b = e.message, e.class, (e.backtrace||{}).join("\n")
+              STDOUT.flush
+              STDERR.print "\n\n#{ m }(#{ c })\n#{ b }\n\n"
+              false
+            end
           if bool
             args = [bool, label]
             assert(*args)
             return true
           end
-          STDERR.puts "\n#{ label.to_s.inspect } not true yet..."
+          STDOUT.flush
+          STDERR.print "\n\n#{ label.to_s.inspect } not true yet...\n\n"
           sleep(sleeps[ i % sleeps.size ])
         end
-        STDERR.puts "\n#{ label.to_s.inspect } *never* became true!"
+        STDOUT.flush
+        STDERR.print "\n\n#{ label.to_s.inspect } *never* became true!\n\n"
         false
       end
 

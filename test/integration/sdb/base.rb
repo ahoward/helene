@@ -1,5 +1,7 @@
 testing Helene::Sdb::Base do
 
+=begin
+=end
   context 'creating' do
     setup do
       @a = model(:a){}
@@ -9,7 +11,6 @@ testing Helene::Sdb::Base do
       assert{ @a.create! }
     end
   end
-
 
   context 'saving' do
     setup do
@@ -61,12 +62,6 @@ testing Helene::Sdb::Base do
       #end
     end
   end
-=begin
-
-  context 'magic fields' do
-    
-  end
-=end
 
   context 'limit > 2500' do
     setup do
@@ -76,17 +71,63 @@ testing Helene::Sdb::Base do
     should 'get all the results' do
       n = 2501
       assert_nothing_raised do
-        records = Array.new(n){ @a.new }
-        a = Time.now.to_f
-        @a.batch_put records
-        b = Time.now.to_f
-        puts(b - a)
+        if @a.count < n
+          records = Array.new(n){ @a.new }
+          a = Time.now.to_f
+          @a.batch_put records
+          b = Time.now.to_f
+          #puts(b - a)
+        end
       end
-      #sleep 3
-      #eventually_assert do
-        #result = @a.find(:all, :limit => n)
-        #assert result.size == n
-      #end
+      eventually_assert do
+        result = @a.find(:all, :limit => n)
+        assert result.size == n
+      end
+    end
+  end
+
+  context 'emptiness' do
+    setup do
+      @a = model(:a) do
+        attribute :x, :string
+        attribute :y, :list_of_string
+      end
+    end
+
+    should 'represent nil' do
+      a = assert{ @a.create! :x => nil }
+      assert{ a.x.nil? }
+      eventually_assert{ a.reload; a.x.nil? }
+    end
+
+    should 'represent the empty list' do
+      a = assert{ @a.create! :y => [] }
+      assert{ a.y==[] }
+      eventually_assert{ a.reload; a.y==[] }
+    end
+
+    should 'represent a list of just nil' do
+      a = assert{ @a.create! :y => [nil] }
+      assert{ a.y==[nil] }
+      eventually_assert{ a.reload; a.y==[nil] }
+    end
+
+    should 'represent the empty string' do
+      a = assert{ @a.create! :x => '' }
+      assert{ a.x=='' }
+      eventually_assert{ a.reload; a.x=='' }
+    end
+
+    should 'represent a list of just the empty string' do
+      a = assert{ @a.create! :y => [''] }
+      assert{ a.y==[''] }
+      eventually_assert{ a.reload; a.y==[''] }
+    end
+
+    should 'represent a list nil and the empty string' do
+      a = assert{ @a.create! :y => [nil, ''] }
+      assert{ a.y==[nil, ''] }
+      eventually_assert{ a.reload; a.y==[nil, ''] }
     end
   end
 

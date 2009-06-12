@@ -197,7 +197,7 @@ module Helene
 
               result["#{prefix}Attribute.#{idx}.Replace"] = 'true' if replace
               result["#{prefix}Attribute.#{idx}.Name"]  = attribute
-              result["#{prefix}Attribute.#{idx}.Value"] = '[]'
+              result["#{prefix}Attribute.#{idx}.Value"] = Sentinel.Array
               idx += 1
 
               values.each do |value|
@@ -270,7 +270,7 @@ module Helene
 
             unless value.nil?
               values = Array(value).flatten
-              values.delete('[]')
+              values.delete(Sentinel.Array)
               values.each do |value|
                 result["Attribute.#{idx}.Name"]  = attribute
                 result["Attribute.#{idx}.Value"] = ruby_to_sdb(value)
@@ -322,7 +322,7 @@ module Helene
           item.each do |key, attributes|
             attributes.keys.each do |name|
               values = attributes[name]
-              array = values.delete('[]')
+              array = values.delete(Sentinel.array)
               attributes[name] =
                 if array
                   values.map{|value| sdb_to_ruby(value)}
@@ -400,20 +400,6 @@ module Helene
           when 'NextToken' then @result[:next_token] = @text
           when 'Value'
             (@result[:items].last[@item][@attribute] ||= []) << @text
-#p @attribute => @text
-=begin
-            hash = @result[:items].last[@item]
-            if @text == '[]'
-              hash[@attribute] = hash.has_key?(@attribute) ? [hash[@attribute]] : []
-            else
-              if hash[@attribute].is_a?(Array)
-                hash[@attribute] << @text
-              else
-                hash[@attribute] = @text
-              end
-            end
-=end
-#p @attribute => hash[@attribute]
           end
         end
       end

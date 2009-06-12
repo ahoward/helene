@@ -14,6 +14,7 @@ module Helene
 
 # TODO - this should be auto generated (for all types!)
 
+=begin
         type(:list_of_string){
           ruby_to_sdb do |value|
             Type.listify(value)
@@ -23,6 +24,7 @@ module Helene
             Type.listify(value)
           end
         }
+=end
 
         type(:timestamp){
           ruby_to_sdb do |value|

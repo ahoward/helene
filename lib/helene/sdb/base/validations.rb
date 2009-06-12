@@ -216,18 +216,6 @@ module Helene
       end
 
       include Validations
-
-      def save
-        valid? ? save_without_validation : false
-      end
-
-      def save!
-        valid? ? save_without_validation : errors! 
-      end
-
-      def errors!
-        raise Validations::Error.new(self, errors.message)
-      end
     end
   end
 end

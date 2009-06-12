@@ -15,20 +15,22 @@ module Helene
         end
 
         class << Type
-          def ruby_to_sdb(value=nil, &block)
-            if block
-              define_method(:ruby_to_sdb, &block)
-            else
-              value
-            end
+          def ruby_to_sdb(value)
+            value==nil ? Sentinel.Nil : value
           end
 
-          def sdb_to_ruby(value=nil, &block)
-            if block
-              define_method(:sdb_to_ruby, &block)
-            else
-              value
-            end
+          def sdb_to_ruby(value)
+            value==Sentinel.Nil ? nil : value
+          end
+
+          def ruby_to_sdb_for(&block)
+            block ||= lambda{|value| value}
+            lambda{|value| value==nil ? Sentinel.Nil : block.call(value)}
+          end
+
+          def sdb_to_ruby_for(&block)
+            block ||= lambda{|value| value}
+            lambda{|value| value==Sentinel.Nil ? nil : block.call(value)}
           end
 
           def array_of_string value
@@ -51,35 +53,61 @@ module Helene
             [list].join(',').strip.split(%r/\s*,\s*/)
           end
 
+          def name
+            @name ||= super
+          end
+          attr_writer :name
+
           def type(name, *args, &block)
             name = name.to_s.underscore
-            type_instance = args.first
-            unless type_instance
-              const = name.camelize
-              if Type.const_defined?(const)
-                type_class = Type.const_get(const)
-              else
-                type_class = Class.new(Type)
-                Type.const_set(const, type_class)
-              end
-              type_class.module_eval(&block)
-              type_instance = type_class.new()
+            type = new(name, &block)
+            list[type.name] = type
+
+            ["list_of_#{ name.singularize }", "list_of_#{ name.pluralize }"].uniq.each do |list_of_name|
+              list_of_type =
+                new(list_of_name) do
+                  ruby_to_sdb do |values|
+                    values = Array(values).flatten
+                    values.each{|value| type.ruby_to_sdb(value)}
+                  end
+                  sdb_to_ruby do |values|
+                    values = Array(values).flatten
+                    values.each{|value| type.sdb_to_ruby(value)}
+                  end
+                end
+              list[list_of_type.name] = list_of_type
             end
-            list[name] = type_instance
+
+            type
           end
           alias_method 'register_type', 'type'
         end
 
-        def ruby_to_sdb(value)
-          value
+      # instance methods
+      #
+        attr_accessor :name
+
+        def initialize name, &block
+          @name = name
+          @ruby_to_sdb = Type.method(:ruby_to_sdb).to_proc
+          @sdb_to_ruby = Type.method(:sdb_to_ruby).to_proc
+          instance_eval(&block)
         end
 
-        def sdb_to_ruby(value)
-          value
+        def ruby_to_sdb(value=nil, &block)
+          if block
+            @ruby_to_sdb = Type.ruby_to_sdb_for(&block)
+          else
+            @ruby_to_sdb.call(value)
+          end
         end
 
-        def name
-          self.class.name.split(%r/::/).last.underscore
+        def sdb_to_ruby(value=nil, &block)
+          if block
+            @sdb_to_ruby = Type.sdb_to_ruby_for(&block)
+          else
+            @sdb_to_ruby.call(value)
+          end
         end
 
         def sti?
