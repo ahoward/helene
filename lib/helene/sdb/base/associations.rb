@@ -61,6 +61,10 @@ module Helene
                 raise NotImplementedError
               end
             __
+
+            associated_class.module_eval <<-__
+              attribute #{ foreign_key.inspect }, :string
+            __
             
             @records = Hash.new
           end
@@ -178,6 +182,7 @@ module Helene
               def #{ name }=(value)
                 #{ name }_association.set(self, value)
               end
+              attribute #{ foreign_key.inspect }, :string, :null => #{ !!options[:null] }
             __
 
             @records = Hash.new

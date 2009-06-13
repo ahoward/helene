@@ -17,13 +17,23 @@ module Helene
       ] unless defined?(HOOKS)
 
       class << Base
+        unless defined?(HOOK_METHOD_AFTER_ASSOCIATION_WARNING)
+          HOOK_METHOD_AFTER_ASSOCIATION_WARNING = <<-__
+            *IMPORTANT:* In order for inheritance to work for the callback
+            queues, you must specify the callbacks before specifying the
+            associations. Otherwise, you might trigger the loading of a child
+            before the parent has registered the callbacks and they won’t be
+            inherited.
+          __
+        end
+
         # Some fancy code generation here in order to define the hook class methods...
         unless defined?(HOOK_METHOD_STR)
           HOOK_METHOD_STR = <<-__ 
             def Base.%s(method = nil, &block)
               unless block
                 (raise Error, 'No hook method specified') unless method
-                block = proc {send method}
+                block = lambda {send method}
               end
               add_hook(%s, &block)
             end
