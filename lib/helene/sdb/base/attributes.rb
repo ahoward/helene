@@ -10,8 +10,6 @@ module Helene
         attr_accessor 'has_default'
         alias_method 'has_default?', 'has_default'
 
-# TODO - default values for attributes
-
         def initialize(*args, &block)
           options = args.extract_options!.to_options!
 
@@ -68,6 +66,11 @@ module Helene
       end
 
       class << Base
+        def attribute(*args, &block)
+          attribute = Attribute.new(self, *args, &block)
+          attributes[attribute.name] = attribute
+        end
+
         def attributes
           unless defined?(@attributes)
             if self == Base
@@ -80,6 +83,21 @@ module Helene
           @attributes
         end
 
+=begin
+ ## dynamically inherit
+
+        def attributes
+          @attributes ||= Array.fields
+          attributes = @attributes.clone
+          superclasses.reverse.each do |superclass|
+            superclass.attributes.each do |name, attribute|
+              attributes[name] ||= attribute
+            end
+          end
+          attributes
+        end
+=end
+
         def attribute_for(name)
           attributes[name.to_s]
         end
@@ -88,15 +106,9 @@ module Helene
           name = name.to_s
           attributes[name].type if attributes.has_key?(name)
         end
-
-        def attribute(*args, &block)
-          attribute = Attribute.new(self, *args, &block)
-          #type_names = 
-          #if attribute.type.name.to_s == 'sti' and attributes.keys.stringify_keys.include?('sti')
-          attributes[attribute.name] = attribute
-        end
       end
 
+      @@attributes = Hash.new
     end
   end
 end

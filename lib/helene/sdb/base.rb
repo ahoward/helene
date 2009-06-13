@@ -36,6 +36,14 @@ module Helene
           subclasses[key] = subclass
         end
 
+        def superclasses
+          @superclasses ||= ancestors.select{|ancestor| ancestor <= Base and ancestor > self} 
+        end
+
+        def superclass
+          @superclass ||= superclasses.first
+        end
+
       # virtual consistency
       #
         def perform_virtual_consistency(*value)
