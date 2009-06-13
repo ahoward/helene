@@ -82,6 +82,27 @@ module Helene
             Array(value).first.to_s
           end
         }
+
+        type(:text){
+          ruby_to_sdb do |value|
+            chunks = value.to_s.scan(%r/.{1,1019}/) # 1024 - '1024:'.size
+            i = -1
+            fmt = '%04d:'
+            chunks.map!{|chunk| [(fmt % (i += 1)), chunk].join}
+            raise ArgumentError, 'that is just too big yo!' if chunks.size >= 256
+            chunks
+          end
+
+          sdb_to_ruby do |value|
+            chunks =
+              Array(value).flatten.map do |chunk|
+                index, text = chunk.split(%r/:/, 2)
+                [Float(index).to_i, text]
+              end
+            chunks.replace chunks.sort_by{|index, text| index}
+            chunks.map!{|index, text| text}.join
+          end
+        }
       end
     end
   end
