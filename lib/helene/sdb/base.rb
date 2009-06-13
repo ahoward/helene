@@ -857,10 +857,12 @@ module Helene
         options.to_options!
         before_save
         if(before_validation()==false)
-          options[:raise] ? raise(RecordInvalid) : return(false)
+          raise(RecordInvalid) if options[:raise]
+          return false
         end
         unless valid?
-          options[:raise] ? raise(RecordInvalid) : return(false)
+          raise(RecordInvalid) if options[:raise]
+          return false
         end
         after_validation()
         save_without_validation

@@ -21,8 +21,8 @@ testing Helene::Sdb::Base do
     end
 
     should 'be able to save a valid object' do
-      assert{ @a.new.save == true }
-      assert{ @b.new(:foo=>'foo').save == true }
+      assert{ @a.new.save }
+      assert{ @b.new(:foo=>'foo').save }
     end
 
     should 'not be able to save an invalid object' do
