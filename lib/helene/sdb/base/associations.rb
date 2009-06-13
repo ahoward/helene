@@ -55,7 +55,11 @@ module Helene
 
             @base.module_eval <<-__
               def #{ name }(*args, &block)
-                #{ name }_association.find(self, *args, &block)
+                @#{ name }_records ||= nil
+                options = args.extract_options!.to_options!
+                forcing = options.delete(:force)
+                @#{ name }_records =   nil if forcing
+                @#{ name }_records ||= #{ name }_association.find(self, *args, &block)
               end
               def #{ name }=(*args, &block)
                 raise NotImplementedError
@@ -65,17 +69,10 @@ module Helene
             associated_class.module_eval <<-__
               # attribute #{ foreign_key.inspect }, :string
             __
-            
-            @records = Hash.new
           end
 
           def find(record, *args, &block)
-            return List.new(record, self, *args, &block) if record.new_record?
-
-            options = args.extract_options!.to_options!
-            forcing = options.delete(:force)
-            @records[record.id] = nil if forcing
-            @records[record.id] ||= List.new(record, self, *args, &block)
+            List.new(record, self, *args, &block)
           end
 
           class List < ::Array
