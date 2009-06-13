@@ -452,11 +452,11 @@ module Helene
             list = ids.flatten.map{|id| escape(id)}.join(',')
             conditions << (conditions.blank? ? " WHERE " : " AND ") << "ItemName() in (#{ list })"
           end
+          #conditions << (conditions.blank? ? " WHERE " : " AND ") << "(deleted_at is not null and every(deleted_at) != 'nil')"
+          #conditions << (conditions.blank? ? " WHERE " : " AND ") << "(every(deleted_at) = 'nil' or deleted_at is null)"
           if want_deleted
-            #conditions << (conditions.blank? ? " WHERE " : " AND ") << "(deleted_at is not null and every(deleted_at) != 'nil')"
             conditions << (conditions.blank? ? " WHERE " : " AND ") << "`deleted_at`!='nil'"
           else
-            #conditions << (conditions.blank? ? " WHERE " : " AND ") << "(every(deleted_at) = 'nil' or deleted_at is null)"
             conditions << (conditions.blank? ? " WHERE " : " AND ") << "`deleted_at`='nil'"
           end
 
@@ -540,7 +540,7 @@ module Helene
               every = false
             end
 
-            lhs = escape_attribute(key =~ %r/^\s*id\s*$/oi ? 'ItemName()' : key)
+            lhs = escape_attribute(key =~ %r/^\s*id\s*$/oi ? ItemName : key)
 
             rhs =
               if value.is_a?(Array)
@@ -591,6 +591,7 @@ module Helene
 
         def escape_attribute(value)
           return value if Literal?(value)
+          return value if value =~ %r/^ItemName(?:\(\))?$/io
           "`#{ value.gsub(%r/`/, '``') }`"
         end
 

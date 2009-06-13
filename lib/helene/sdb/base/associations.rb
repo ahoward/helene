@@ -23,7 +23,7 @@ module Helene
           @options = options.to_options!
 
           instance_eval(&block) if block
-          @class_name ||= options[:class_name] || @name.camelize.singularize
+          @class_name ||= (options[:class_name] || @name.camelize.singularize).to_s
 
           association = self
           @base.module_eval do
@@ -34,7 +34,6 @@ module Helene
         def associated_class
           @associated_class ||= class_name.constantize
         end
-
 
         class OneToMany < Association
           attr :list
@@ -52,27 +51,27 @@ module Helene
               @foreign_key ||= "#{ @polymorphic }_id"
             end
 
-            @foreign_key ||= options[:foreign_key] ||
-                             "#{ @base.name.downcase }_id"
+            @foreign_key ||= (options[:foreign_key] || @base.name.foreign_key).to_s
 
             @base.module_eval <<-__
               def #{ name }(*args, &block)
-                #{ name }_association.list(self, *args, &block)
+                #{ name }_association.find(self, *args, &block)
               end
-
               def #{ name }=(*args, &block)
                 raise NotImplementedError
               end
             __
             
-            @lists = Hash.new
+            @records = Hash.new
           end
 
-          def list(record, *args, &block)
+          def find(record, *args, &block)
             return List.new(record, self, *args, &block) if record.new_record?
-            forcing           =   args.options.delopt(:force)
-            @lists[record.id] =   nil if forcing
-            @lists[record.id] ||= List.new(record, self, *args, &block)
+
+            options = args.extract_options!.to_options!
+            forcing = options.delete(:force)
+            @records[record.id] = nil if forcing
+            @records[record.id] ||= List.new(record, self, *args, &block)
           end
 
           class List < ::Array
@@ -156,6 +155,55 @@ module Helene
         end
 
         class ManyToOne < Association
+          attr :polymorphic
+          attr :foreign_type
+          attr :foreign_key
+
+          def initialize(base, name, options = {}, &block)
+            super
+
+            @polymorphic ||= options[:polymorphic]
+
+            if @polymorphic
+              @foreign_type ||= "#{ @polymorphic }_type"
+              @foreign_key ||= "#{ @polymorphic }_id"
+            end
+
+            @foreign_key ||= options[:foreign_key] || class_name.foreign_key
+
+            @base.module_eval <<-__
+              def #{ name }(*args, &block)
+                #{ name }_association.get(self, *args, &block)
+              end
+              def #{ name }=(value)
+                #{ name }_association.set(self, value)
+              end
+            __
+
+            @records = Hash.new
+          end
+
+          def get(record, *args, &block)
+            options = args.extract_options!.to_options!
+            forcing = options.delete(:force)
+            @records[record.id] = nil if forcing
+            @records[record.id] ||= find_associated_object_for(record)
+          end
+
+          def find_associated_object_for(record)
+            return nil unless record[foreign_key]
+            conditions = {}
+            if foreign_type
+              conditions[foreign_type] = class_name
+            end
+            conditions[:id] = record[foreign_key]
+            associated = associated_class.find(:first, :conditions => conditions)
+          end
+
+          def set(record, value)
+            record[foreign_key] = value.is_a?(Base) ? value.id : value
+            value
+          end
         end
 
         class ManyToMany < Association
@@ -185,6 +233,9 @@ module Helene
 
         def has_many(*args, &block)
           associates(:one_to_many, *args, &block)
+        end
+        def belongs_to(*args, &block)
+          associates(:many_to_one, *args, &block)
         end
         def one_to_many(*args, &block)
           associates(:one_to_many, *args, &block)
