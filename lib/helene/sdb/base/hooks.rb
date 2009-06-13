@@ -8,6 +8,8 @@ module Helene
         :after_create,
         :before_update,
         :after_update,
+        :before_validation,
+        :after_validation,
         :before_save,
         :after_save,
         :before_destroy,

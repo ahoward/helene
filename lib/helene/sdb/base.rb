@@ -818,6 +818,10 @@ module Helene
         attributes.update(options)
       end
 
+      def raising_an_error?
+        $!
+      end
+
       def updating(&block)
         return(block.call) if(defined?(@updating) and @updating)
         @updating = true
@@ -826,7 +830,7 @@ module Helene
         block.call
       ensure
         @updating = false
-        after_update unless $!
+        after_update unless raising_an_error?
       end
 
       def save_without_validation
@@ -835,7 +839,7 @@ module Helene
           connection.put_attributes(domain, id, sdb_attributes, :replace)
           virtually_load(sdb_attributes)
           mark_as_old!
-          errors.empty?
+          self
         end
       end
 
@@ -849,18 +853,23 @@ module Helene
         end
       end
 
-      def save
+      def save(options = {})
+        options.to_options!
         before_save
-        valid? ? save_without_validation : false
+        if(before_validation()==false)
+          options[:raise] ? raise(RecordInvalid) : return(false)
+        end
+        unless valid?
+          options[:raise] ? raise(RecordInvalid) : return(false)
+        end
+        after_validation()
+        save_without_validation
       ensure
-        after_save unless $!
+        after_save unless raising_an_error?
       end
 
       def save!
-        before_save
-        valid? ? save_without_validation : errors! 
-      ensure
-        after_save unless $!
+        save(:raise => true)
       end
 
       def errors!
