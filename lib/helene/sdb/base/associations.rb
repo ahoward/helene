@@ -174,22 +174,21 @@ module Helene
 
             @base.module_eval <<-__
               def #{ name }(*args, &block)
-                #{ name }_association.get(self, *args, &block)
+                @#{ name }_record ||= nil
+                options = args.extract_options!.to_options!
+                forcing = options.delete(:force)
+                @#{ name }_record =   nil if forcing
+                @#{ name }_record ||= #{ name }_association.get(self, *args, &block)
               end
               def #{ name }=(value)
                 #{ name }_association.set(self, value)
               end
               # attribute #{ foreign_key.inspect }, :string, :null => #{ !!options[:null] }
             __
-
-            @records = Hash.new
           end
 
           def get(record, *args, &block)
-            options = args.extract_options!.to_options!
-            forcing = options.delete(:force)
-            @records[record.id] = nil if forcing
-            @records[record.id] ||= find_associated_object_for(record)
+            find_associated_object_for(record)
           end
 
           def find_associated_object_for(record)
