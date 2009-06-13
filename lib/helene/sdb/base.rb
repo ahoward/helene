@@ -14,6 +14,7 @@ module Helene
       load 'helene/sdb/base/attributes.rb'
       load 'helene/sdb/base/associations.rb'
       load 'helene/sdb/base/transactions.rb'
+      load 'helene/sdb/base/hooks.rb'
 
       include Attempt
 
@@ -27,8 +28,10 @@ module Helene
         def inherited(subclass)
           super
         ensure
+# TODO - use class_inherited_array - etc
           subclass.domain = domain unless self==Base
           subclass.perform_virtual_consistency = perform_virtual_consistency
+          subclass.hooks = hooks.dup
           key = subclass.name.blank? ? subclass.inspect : subclass.name
           subclasses[key] = subclass
         end
@@ -146,13 +149,17 @@ module Helene
       #
         def create(attributes={})
           record = new(attributes)
+          record.before_create
           record.save
+          record.after_create
           record
         end
 
         def create!(attributes={})
           record = new(attributes)
+          record.before_create
           record.save!
+          record.after_create
           record
         end
 
@@ -712,12 +719,15 @@ module Helene
 
     # instance methods
     #
-      def initialize(*args)
-        options = args.extract_options!.to_options!
-        @id = args.size == 1 ? args.shift : generate_id
+      def initialize(*args, &block)
+        @args, @block = args, block
+        before_initialize
+        options = @args.extract_options!.to_options!
+        @id = @args.size == 1 ? @args.shift : generate_id
         @new_record = !!!options.delete(:new_record)
         @attributes = Attributes.for(options)
         klass.attributes.each{|attribute| attribute.initialize_record(self)}
+        after_initialize
       end
 
       def klass
@@ -807,13 +817,25 @@ module Helene
         attributes.update(options)
       end
 
-      def save_without_validation
+      def updating(&block)
+        return(block.call) if(defined?(@updating) and @updating)
+        @updating = true
         prepare_for_update
-        sdb_attributes = ruby_to_sdb
-        connection.put_attributes(domain, id, sdb_attributes, :replace)
-        virtually_load(sdb_attributes)
-        mark_as_old!
-        errors.empty?
+        before_update
+        block.call
+      ensure
+        @updating = false
+        after_update unless $!
+      end
+
+      def save_without_validation
+        updating do
+          sdb_attributes = ruby_to_sdb
+          connection.put_attributes(domain, id, sdb_attributes, :replace)
+          virtually_load(sdb_attributes)
+          mark_as_old!
+          errors.empty?
+        end
       end
 
       def prepare_for_update
@@ -827,11 +849,17 @@ module Helene
       end
 
       def save
+        before_save
         valid? ? save_without_validation : false
+      ensure
+        after_save unless $!
       end
 
       def save!
+        before_save
         valid? ? save_without_validation : errors! 
+      ensure
+        after_save unless $!
       end
 
       def errors!
@@ -839,75 +867,82 @@ module Helene
       end
 
       def update!(options = {})
-        attributes.update(options)
-        save!
-        virtually_save(attributes)
-        self
+        updating do
+          attributes.update(options)
+          save!
+          virtually_save(attributes)
+          self
+        end
       end
 
       def put_attributes(attributes)
-        check_id!
-        prepare_for_update
-        sdb_attributes = ruby_to_sdb(attributes)
-        connection.put_attributes(domain, id, sdb_attributes)
-        virtually_put(sdb_attributes)
-        self
+        updating do
+          sdb_attributes = ruby_to_sdb(attributes)
+          connection.put_attributes(domain, id, sdb_attributes)
+          virtually_put(sdb_attributes)
+          self
+        end
       end
 
       def save_attributes(attributes = self.attributes)
-        check_id!
-        prepare_for_update
-        sdb_attributes = ruby_to_sdb(attributes)
-        connection.put_attributes(domain, id, sdb_attributes, :replace)
-        virtually_save(sdb_attributes)
-        self
+        updating do
+          sdb_attributes = ruby_to_sdb(attributes)
+          connection.put_attributes(domain, id, sdb_attributes, :replace)
+          virtually_save(sdb_attributes)
+          self
+        end
       end
 
       def replace_attributes(attributes = self.attributes)
-        delete_attributes(self.attributes.keys)
-        save_attributes(attributes)
-        self
+        updating do
+          delete_attributes(self.attributes.keys)
+          save_attributes(attributes)
+          self
+        end
       end
 
       def delete_attributes(*args)
-        check_id!
-        args.flatten!
-        args.compact!
-        hashes, arrays = args.partition{|arg| arg.is_a?(Hash)}
-        hashes.map!{|hash| stringify(hash)}
-        hashes.each do |hash|
-          raise ArgumentError, hash.inspect if hash.values.any?{|value| value == nil or value == []}
+        updating do
+          args.flatten!
+          args.compact!
+          hashes, arrays = args.partition{|arg| arg.is_a?(Hash)}
+          hashes.map!{|hash| stringify(hash)}
+          hashes.each do |hash|
+            raise ArgumentError, hash.inspect if hash.values.any?{|value| value == nil or value == []}
+          end
+          array = stringify(arrays.flatten)
+          unless array.empty?
+            array_as_hash = array.inject({}){|h,k| h.update k => nil}
+            hashes.push(array_as_hash)
+          end
+          hashes.each{|hash|
+            next if hash.empty?
+            connection.delete_attributes(domain, id, hash)
+            virtually_delete(hash)
+          }
+          self
         end
-        array = stringify(arrays.flatten)
-        unless array.empty?
-          array_as_hash = array.inject({}){|h,k| h.update k => nil}
-          hashes.push(array_as_hash)
-        end
-        hashes.each{|hash|
-          next if hash.empty?
-          connection.delete_attributes(domain, id, hash)
-          virtually_delete(hash)
-        }
-        self
       end
       alias_method 'delete_values', 'delete_attributes'
 
       def delete!
-        check_id!
         connection.delete_item(domain, id)
         self
       end
 
       def delete(options = {})
-        options.to_options!
-        check_id!
-        return delete! if options[:force]
-        attributes['deleted_at'] = Transaction.time
-        update!
+        updating do
+          options.to_options!
+          return delete! if options[:force]
+          attributes['deleted_at'] = Transaction.time
+          update!
+        end
       end
 
       def destroy
+        before_destroy
         delete
+        after_destroy
       end
 
     # virtual consistency
