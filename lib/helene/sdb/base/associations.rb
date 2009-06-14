@@ -67,7 +67,7 @@ module Helene
             __
 
             associated_class.module_eval <<-__
-              # attribute #{ foreign_key.inspect }, :string
+              attribute #{ foreign_key.inspect }, :string
             __
           end
 
@@ -183,7 +183,7 @@ module Helene
               def #{ name }=(value)
                 #{ name }_association.set(self, value)
               end
-              # attribute #{ foreign_key.inspect }, :string, :null => #{ !!options[:null] }
+              attribute #{ foreign_key.inspect }, :string, :null => #{ !!options[:null] }
             __
           end
 
