@@ -66,49 +66,28 @@ module Helene
       end
 
       class << Base
+        def attributes_table
+          @attributes_table ||= (Base==self ? SuperHash.new() : SuperHash.new(superclass.attributes_table))
+        end
+
+        def attributes
+          attributes_table.values
+        end
+
         def attribute(*args, &block)
           attribute = Attribute.new(self, *args, &block)
-          attributes[attribute.name] = attribute
+          attributes_table[attribute.name] = attribute
         end
-
-        def attributes
-          unless defined?(@attributes)
-            if self == Base
-              @attributes ||= Array.fields
-            else
-              parent = ancestors[1]
-              @attributes = parent.attributes.clone # inherit attributes - recurses up
-            end
-          end
-          @attributes
-        end
-
-=begin
- ## dynamically inherit
-
-        def attributes
-          @attributes ||= Array.fields
-          attributes = @attributes.clone
-          superclasses.reverse.each do |superclass|
-            superclass.attributes.each do |name, attribute|
-              attributes[name] ||= attribute
-            end
-          end
-          attributes
-        end
-=end
 
         def attribute_for(name)
-          attributes[name.to_s]
+          attributes_table[name.to_s]
         end
 
         def type_for(name)
           name = name.to_s
-          attributes[name].type if attributes.has_key?(name)
+          attributes_table[name].type if attributes_table.has_key?(name)
         end
       end
-
-      @@attributes = Hash.new
     end
   end
 end

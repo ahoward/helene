@@ -76,6 +76,7 @@ module Helene
     load 'error.rb'
     load 'util.rb'
     load 'sleepcycle.rb'
+    load 'superhash.rb'
     load 'attempt.rb'
     load 'logging.rb'
     load 'config.rb'
