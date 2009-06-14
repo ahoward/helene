@@ -1064,9 +1064,14 @@ module Helene
         raise Error.new('No record id') unless id
       end
       
-      
-      def to_hash
-        raise NotImplementedError
+      def to_hash(options = {})
+        options.to_options!
+        depth = options[:depth] || 0
+        if depth == 0
+          attributes.to_hash
+        else
+          raise NotImplementedError
+        end
       end
 
       def to_yaml
