@@ -81,7 +81,7 @@ them.
 
     # Number of times to retry the request after encountering the first error
     unless defined?(HTTP_CONNECTION_RETRY_COUNT)
-      HTTP_CONNECTION_RETRY_COUNT   = 3
+      HTTP_CONNECTION_RETRY_COUNT   = 42  # up the 3
     end
     # Throw a Timeout::Error if a connection isn't established within this number of seconds
     unless defined?(HTTP_CONNECTION_OPEN_TIMEOUT)
@@ -426,7 +426,7 @@ them.
       if @http && @http.started?
         reason = ", reason: '#{reason}'" unless reason.blank?
         @logger.info("Closing #{@http.use_ssl? ? 'HTTPS' : 'HTTP'} connection to #{@http.address}:#{@http.port}#{reason}")
-        @http.finish
+        @http.finish rescue nil  # it's possible for a Thread to reset this before we can finish it (so it wouldn't be started)
       end
     end
 

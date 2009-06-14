@@ -72,16 +72,16 @@ module Helene
         thread = Thread.current
         thread[:sdb_connection] ||= Rightscale::HttpConnection.new(:exception => AwsError, :logger => @logger)
         e = nil
-        42.times do
-          begin
+        # 42.times do
+        #   begin
             return request_info_impl(thread[:sdb_connection], @@bench, request, parser)
-          rescue Object => e
-            raise unless e.class <= StandardError
-            @logger.error{ e } rescue nil
-            thread[:sdb_connection] = Rightscale::HttpConnection.new(:exception => AwsError, :logger => @logger)
-            next
-          end
-        end
+        #   rescue Object => e
+        #     raise unless e.class <= StandardError
+        #     @logger.error{ e } rescue nil
+        #     thread[:sdb_connection] = Rightscale::HttpConnection.new(:exception => AwsError, :logger => @logger)
+        #     next
+        #   end
+        # end
         raise(e || 'wtf')
       end
 
