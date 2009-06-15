@@ -16,6 +16,7 @@ module Helene
         attr :options
         attr :class_name
         attr :foreign_key
+        attr :dependent
 
         def initialize(base, name, options = {}, &block)
           @base = base
@@ -24,6 +25,7 @@ module Helene
 
           instance_eval(&block) if block
           @class_name ||= (options[:class_name] || @name.camelize.singularize).to_s
+          @dependent ||= (options[:dependent] || :nullify).to_s.to_sym
 
           association = self
           @base.module_eval do
@@ -35,7 +37,7 @@ module Helene
           @associated_class ||= class_name.constantize
         end
 
-        class OneToMany < Association
+        class HasMany < Association
           attr :list
           attr :polymorphic
           attr :foreign_type
@@ -55,24 +57,36 @@ module Helene
 
             @base.module_eval <<-__
               def #{ name }(*args, &block)
-                @#{ name }_records ||= nil
+                association = #{ name }_association()
+                @#{ name } ||= nil
                 options = args.extract_options!.to_options!
                 forcing = options.delete(:force)
-                @#{ name }_records =   nil if forcing
-                @#{ name }_records ||= #{ name }_association.find(self, *args, &block)
+                @#{ name } =  nil if forcing
+                @#{ name } ||= association.get(self, *args, &block)
               end
-              def #{ name }=(*args, &block)
-                raise NotImplementedError
-              end
-            __
 
-            associated_class.module_eval <<-__
-              # attribute #{ foreign_key.inspect }, :string
+              def #{ name }=(*values)
+                association = #{ name }_association()
+                association.set(self, *values)
+              end
             __
           end
 
-          def find(record, *args, &block)
+          def get(record, *args, &block)
             List.new(record, self, *args, &block)
+          end
+
+          def set(record, *records)
+            list = record.send(name)
+            case dependent
+              when :destroy_all
+                list.destroy
+              when :delete_all
+                list.delete_all
+              when :nullify_all
+                list.nullify
+            end
+            list.associate(*records)
           end
 
           class List < ::Array
@@ -104,6 +118,21 @@ module Helene
               __
             end
 
+            def destroy_all
+              each{|record| record.destroy}
+            end
+
+            def delete_all
+              each{|record| record.delete}
+            end
+
+            def nullify_all
+              each do |record|
+                record.send("#{ foreign_key }=", nil)
+                record.send("#{ foreign_type }=", nil) if foreign_type
+              end
+            end
+
             def reload
               conditions = {}
 
@@ -129,6 +158,14 @@ module Helene
               record
             end
 
+            def associate(*records)
+              Array(records).flatten.each do |record|
+                record.send("#{ foreign_type }=", parent_type) if foreign_type
+                record.send("#{ foreign_key }=", parent_id)
+                self << record
+              end
+            end
+
             def create(attributes = {})
               build(attributes).save
             end
@@ -138,24 +175,26 @@ module Helene
             end
 
             def save
-              each.map{|record| record.save}
+              map!{|record| record.save}
+              self
             end
 
             def save!
-              each.map{|record| record.save!}
+              map!{|record| record.save!}
+              self
             end
 
             def valid?
-              each.map{|record| record.valid?}.all?
+              map{|record| record.valid?}.all?
             end
 
             def validate!
-              each.map{|record| record.validate!}
+              map{|record| record.validate!}
             end
           end
         end
 
-        class ManyToOne < Association
+        class BelongsTo < Association
           attr :polymorphic
           attr :foreign_type
           attr :foreign_key
@@ -207,44 +246,72 @@ module Helene
           end
         end
 
-        class ManyToMany < Association
+        class HasOne < Association
+          def initialize(base, name, options = {}, &block)
+            super
+
+            pluralized = name.to_s.pluralize
+
+            @base.module_eval {
+              unless instance_methods.include?(pluralized)
+                has_many(base, pluralized, options, &block)
+              end
+            }
+
+            @base.module_eval <<-__
+              def #{ name }(*args, &block)
+                @#{ name } ||= nil
+                options = args.extract_options!.to_options!
+                forcing = options.delete(:force)
+                @#{ name } =  nil if forcing
+                @#{ name } ||= #{ pluralized }().first
+              end
+
+              def #{ name }=(value)
+                if #{ name }()
+                  # replace this record according to dependent rules
+                else
+                  self.#{ pluralized } = [value]
+                end
+              end
+            __
+          end
         end
-      end
 
 
-      class << Base
-        def associations()
-          @associations ||= Array.fields
+        class << Base
+          def associations()
+            @associations ||= Array.fields
+          end
+
+          def association(type, *args, &block)
+            association =
+              case type.to_s.to_sym
+                when :has_many
+                  Association::HasMany.new(self, *args, &block)
+                when :belongs_to
+                  Association::BelongsTo.new(self, *args, &block)
+                when :has_one
+                  Association::HasOne.new(self, *args, &block)
+              end
+            associations[association.name] = association
+          end
+          alias_method 'associate', 'association'
+          alias_method 'associates', 'association'
+
+          def has_many(*args, &block)
+            associates(:has_many, *args, &block)
+          end
+          def belongs_to(*args, &block)
+            associates(:belongs_to, *args, &block)
+          end
+          def has_one(*args, &block)
+            associates(:has_one, *args, &block)
+          end
         end
 
-        def association(type, *args, &block)
-          association =
-            case type.to_s.to_sym
-              when :one_to_many
-                Association::OneToMany.new(self, *args, &block)
-              when :many_to_one
-                Association::ManyToOne.new(self, *args, &block)
-              when :many_to_many
-                Association::ManyToMany.new(self, *args, &block)
-            end
-          associations[association.name] = association
-        end
-        alias_method 'associate', 'association'
-        alias_method 'associates', 'association'
-
-        def has_many(*args, &block)
-          associates(:one_to_many, *args, &block)
-        end
-        def belongs_to(*args, &block)
-          associates(:many_to_one, *args, &block)
-        end
-        def one_to_many(*args, &block)
-          associates(:one_to_many, *args, &block)
-        end
       end
     end
   end
-
-
 end
 
