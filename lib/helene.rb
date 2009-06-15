@@ -70,6 +70,12 @@ module Helene
     defined?(Rails)
   end
 
+  def Helene.rails_root(*args)
+    if rails?
+      File.join(RAILS_ROOT, *args.flatten.map{|arg| arg.to_s})
+    end
+  end
+
 # helene
 #
   Helene.load_path do
@@ -97,4 +103,11 @@ module Helene
     (defined?(AMAZON_CA_FILE) and AMAZON_CA_FILE) ||
     (defined?(CA_FILE) and CA_FILE)
   Rightscale::HttpConnection.params[:ca_file] = ca_file if ca_file
+
+# allow configuration of in a rails project to be defined in config/helene.rb
+#
+  if rails?
+    config = rails_root('config', 'helene.rb')
+    Kernel.load(config) if test(?s, config)
+  end
 end
