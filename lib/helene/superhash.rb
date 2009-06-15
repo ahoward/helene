@@ -6,16 +6,18 @@ module Helene
     
     def initialize parents = [], default = nil
       @hash = Hash.new default
-      @parents = Array(parents).flatten
-=begin
-      if parents == nil
-        @parents = []
-      elsif parents.respond_to? :key?
-        @parents = [parents]
-      else
-        @parents = parents
+      @parents =
+        case parents
+          when NilClass
+            []
+          when Array
+            parents.flatten
+          else
+            [parents]
+        end
+      @parents.each do |parent|
+        raise ArgumentError, parent.class.name unless parent.respond_to?('key?')
       end
-=end
     end
 
     # methods that are not overrides of Hash methods

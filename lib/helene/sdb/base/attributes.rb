@@ -68,6 +68,7 @@ module Helene
       class << Base
         def attributes_table
           @attributes_table ||= (Base==self ? SuperHash.new() : SuperHash.new(superclass.attributes_table))
+          #@attributes_table ||= (Base==self ? Array.fields() : superclass.attributes_table.clone)
         end
 
         def attributes
