@@ -66,6 +66,10 @@ module Helene
     end
   end
 
+  def Helene.rails?
+    defined?(Rails)
+  end
+
 # helene
 #
   Helene.load_path do

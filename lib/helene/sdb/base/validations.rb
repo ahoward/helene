@@ -24,7 +24,6 @@ module Helene
         def errors
           if(not defined?(@errors) or @errors.nil?)
             @errors ||= Errors.new(self)
-            validate
           end
           @errors
         end
