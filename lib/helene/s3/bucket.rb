@@ -77,6 +77,16 @@ module Helene
         s3g.keys(options, expires, headers)
       end
 
+      def root(*args, &block)
+        namespace(self, name='', *args, &block)
+      end
+
+      def namespace(name, *args, &block)
+        Namespace.new(self, name, *args, &block)
+      end
+      alias_method 'namespaced', 'namespace'
+      alias_method '/', 'namespace'
+
       class Namespace
         attr :bucket
         attr :name
@@ -145,11 +155,6 @@ module Helene
         end
       end
 
-      def namespace(name, *args, &block)
-        Namespace.new(self, name, *args, &block)
-      end
-      alias_method 'namespaced', 'namespace'
-      alias_method '/', 'namespace'
     end
   end
 end

@@ -71,6 +71,8 @@ module Helene
           on_exception
         end
       end
+
+      load 'helene/s3/bucket.rb'
     end
   end
 end
