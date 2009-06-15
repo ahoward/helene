@@ -140,6 +140,8 @@ module Helene
               :message => 'is not confirmed',
             }.merge!(atts.extract_options!)
             
+            atts.each { |a| attr_accessor :"#{a}_confirmation" }
+            
             validates_each(*atts) do |o, a, v|
               next if (v.nil? && opts[:allow_nil]) || (v.blank? && opts[:allow_blank])
               c = o.send(:"#{a}_confirmation")

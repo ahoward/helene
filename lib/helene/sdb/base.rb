@@ -734,7 +734,15 @@ module Helene
         options = @args.extract_options!.to_options!
         @id = @args.size == 1 ? @args.shift : generate_id
         @new_record = !!!options.delete(:new_record)
-        @attributes = Attributes.for(options)
+        @attributes = Attributes.new
+        options.each do |name, value|
+          meth = "#{name}="
+          if respond_to? meth
+            self.send(meth, value)
+          else
+            @attributes[name] = value
+          end
+        end
         klass.attributes.each{|attribute| attribute.initialize_record(self)}
         after_initialize
       end
