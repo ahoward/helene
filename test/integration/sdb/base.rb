@@ -187,32 +187,26 @@ testing Helene::Sdb::Base do
     end
   end
 
-
-=begin
   context 'associations' do
-    context 'one_to_many' do
-      class A < Helene::Sdb::Base
-        one_to_many :bs
-      end
-
-      class B < Helene::Sdb::Base
-        attribute :a_id
-      end
-
+    context 'has_many' do
       setup do
+        @a = model(:a) do
+          has_many :bs
+        end
+        @b = model(:b) do
+          attribute :a_id
+        end
       end
 
-      should 'support simple one_to_many' do
-        a = assert{ A.create! }
+      should 'support simple has_many' do
+        a = assert{ @a.create! }
         assert{ a.respond_to?(:bs) }
-        b = assert{ B.create! }
-        #assert{ a.respond_to?(:a_id) }
-        #assert{ a.bs << b }
-        p a.bs
+        b = assert{ @b.create! }
+        assert{ b.respond_to?(:a_id) }
+        assert{ a.bs << b }
+        assert{ b.a_id == a.id }
       end
-
     end
   end
-=end
 
 end

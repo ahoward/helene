@@ -5,6 +5,9 @@ module Helene
         name = name.to_s
         @models ||= {}
         @models[name] ||= Class.new(Helene::Sdb::Base){ domain "helene-test-model-#{ name }" }
+        class_name = name.classify
+        ::Object.send(:remove_const, class_name) if ::Object.const_defined?(class_name)
+        ::Object.const_set(class_name, @models[name])
         @models[name].module_eval(&block) if block
         @models[name]
       end
