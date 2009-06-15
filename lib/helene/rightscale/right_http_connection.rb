@@ -133,6 +133,9 @@ them.
     attr_accessor :server
     attr_accessor :params      # see @@params
     attr_accessor :logger
+    attr_accessor :thread
+    attr_accessor :state
+    attr_accessor :eof
 
      # Params hash:
      #  :user_agent => 'www.HostName.com'    # String to report as HTTP User agent
@@ -145,6 +148,7 @@ them.
      #  :http_connection_retry_delay         # by default == Rightscale::HttpConnection.params[:http_connection_retry_delay]
      #
     def initialize(params={})
+      @thread = Thread.current
       @params = params
       @params[:http_connection_retry_count]  ||= @@params[:http_connection_retry_count]
       @params[:http_connection_open_timeout] ||= @@params[:http_connection_open_timeout]
@@ -155,6 +159,19 @@ them.
       @logger = get_param(:logger) ||
                 (RAILS_DEFAULT_LOGGER if defined?(RAILS_DEFAULT_LOGGER)) ||
                 Logger.new(STDOUT)
+      @state = {}
+      @eof = {}
+    end
+
+    def prevent_mt_use!
+      unless Thread.current==@thread
+        STDERR.puts
+        STDERR.puts "#{ Thread.current.inspect } and  #{ @thread.inspect } both using #{ self.inspect }!"
+        STDERR.puts
+        STDERR.puts caller.join("\n") 
+        STDERR.puts
+        abort
+      end
     end
 
     def get_param(name)
@@ -190,35 +207,29 @@ them.
     end
 
   private
-    #--------------
-    # Retry state - Keep track of errors on a per-server basis
-    #--------------
-    @@state = {}  # retry state indexed by server: consecutive error count, error time, and error
-    @@eof   = {}
-
     # number of consecutive errors seen for server, 0 all is ok
     def error_count
-      @@state[@server] ? @@state[@server][:count] : 0
+      state[@server] ? state[@server][:count] : 0
     end
 
     # time of last error for server, nil if all is ok
     def error_time
-      @@state[@server] && @@state[@server][:time]
+      state[@server] && state[@server][:time]
     end
 
     # message for last error for server, "" if all is ok
     def error_message
-      @@state[@server] ? @@state[@server][:message] : ""
+      state[@server] ? state[@server][:message] : ""
     end
 
     # add an error for a server
     def error_add(message)
-      @@state[@server] = { :count => error_count+1, :time => Time.now, :message => message }
+      state[@server] = { :count => error_count+1, :time => Time.now, :message => message }
     end
 
     # reset the error state for a server (i.e. a request succeeded)
     def error_reset
-      @@state.delete(@server)
+      state.delete(@server)
     end
 
     # Error message stuff...
@@ -234,25 +245,26 @@ them.
       # Returns the number of seconds to wait before new conection retry:
       #  0.5, 1, 2, 4, 8
     def add_eof
-      (@@eof[@server] ||= []).unshift Time.now
-      0.25 * 2 ** @@eof[@server].size
+      (eof[@server] ||= []).unshift Time.now
+      0.25 * 2 ** eof[@server].size
     end
 
-      # Returns first EOF timestamp or nul if have no EOFs being tracked.
-    def eof_time
-      @@eof[@server] && @@eof[@server].last
-    end
 
       # Returns true if we are receiving EOFs during last @params[:http_connection_retry_delay] seconds
       # and there were no successful response from server
     def raise_on_eof_exception?
-      @@eof[@server].blank? ? false : ( (Time.now.to_i-@params[:http_connection_retry_delay]) > @@eof[@server].last.to_i )
+      eof[@server].blank? ? false : ( (Time.now.to_i-@params[:http_connection_retry_delay]) > eof[@server].last.to_i )
     end
 
-      # Reset a list of EOFs for this server.
-      # This is being called when we have got an successful response from server.
+    # Returns first EOF timestamp or nul if have no EOFs being tracked.
+    def eof_time
+      eof[@server] && eof[@server].last
+    end
+
+    # Reset a list of EOFs for this server.
+    # This is being called when we have got an successful response from server.
     def eof_reset
-      @@eof.delete(@server)
+      eof.delete(@server)
     end
 
     # Detects if an object is 'streamable' - can we read from it, and can we know the size?
@@ -335,6 +347,7 @@ them.
 
 =end
     def request(request_params, &block)
+      prevent_mt_use!
       # We save the offset here so that if we need to retry, we can return the file pointer to its initial position
       mypos = get_fileptr_offset(request_params)
       loop do
@@ -423,6 +436,7 @@ them.
     end
 
     def finish(reason = '')
+      prevent_mt_use!
       if @http && @http.started?
         reason = ", reason: '#{reason}'" unless reason.blank?
         @logger.info("Closing #{@http.use_ssl? ? 'HTTPS' : 'HTTP'} connection to #{@http.address}:#{@http.port}#{reason}")

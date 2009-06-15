@@ -197,7 +197,7 @@ module Helene
           end
 
           results =
-            to_put.threadify(:each_slice, 25) do |slice|
+            to_put.threadify(4, :each_slice, 25) do |slice|
               items = Hash[*slice.to_a.flatten]
               connection.batch_put_attributes(domain, items, options.update(:replace => replace))
             end.flatten
@@ -348,7 +348,7 @@ module Helene
                 if block
                   ids.each_slice(20){|slice| execute_select(*[slice, options], &block)}
                 else
-                  records = ids.threadify(:each_slice, 20){|slice| execute_select(*[slice, options])}.flatten
+                  records = ids.threadify(4, :each_slice, 20){|slice| execute_select(*[slice, options])}.flatten
                   # records = ids.each_slice(20){|slice| execute_select(*[slice, options].flatten)}.flatten
                   return(limit ? records[0,limit] : records)
                 end

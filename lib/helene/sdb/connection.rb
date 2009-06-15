@@ -12,13 +12,13 @@ module Helene
 
         options[:multi_thread] = true unless options.has_key?(:multi_thread)
 
-        @connection = Interface.new(aws_access_key_id, aws_secret_access_key, options)
+        Thread.current[:helene_sdb_connection] = Interface.new(aws_access_key_id, aws_secret_access_key, options)
       end
 
       def connection
-        @connection ||= establish_connection
+        Thread.current[:helene_sdb_connection] ||= establish_connection
       ensure
-        raise Error.new('Connection to SDB is not established') unless @connection
+        raise Error.new('Connection to SDB is not established') unless Thread.current[:helene_sdb_connection]
       end
       alias_method 'interface', 'connection'
     end

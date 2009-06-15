@@ -3,7 +3,7 @@ module Helene
     class Base
       class << Base
         def connection
-          @connection ||= Sdb.connection
+          Thread.current[:helene_sdb_base_connection] ||= Sdb.connection
         end
         alias_method 'interface', 'connection'
 
@@ -14,7 +14,7 @@ module Helene
           aws_secret_access_key =
             options.delete(:aws_secret_access_key) || args.shift || Helene.aws_secret_access_key
           options.reverse_merge(:nil_representation => nil_representation)
-          @connection = Interface.new(aws_access_key_id, aws_secret_access_key, options)
+          Thread.current[:helene_sdb_base_connection] = Interface.new(aws_access_key_id, aws_secret_access_key, options)
         end
       end
 
