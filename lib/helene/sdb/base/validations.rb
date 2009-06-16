@@ -84,17 +84,18 @@ module Helene
         end
         
         class Validation
-          def initialize(on = nil, &validate)
-            @on       = on
-            @validate = validate
+          def initialize(on = :save, &validation)
+            @on         = (on || :save).to_sym
+            @validation = validation || lambda { |o, att, v|  }
           end
           
           attr_reader :on
           
-          def run(save_type, *args)
-            validate && validate[*args] if on.nil? ||
-                                           [:save, save_type].include?(on)
+          def call(o, att, v)
+            save_type = o.new_record? ? :create : :update
+            @validation[o, att, v] if [:save, save_type].include?(on)
           end
+          alias_method :[], :call
         end
         
         module ClassMethods
@@ -128,11 +129,12 @@ module Helene
           end
           
           def validates_each(*atts, &block)
-            atts.each {|a| validations[a] << block}
+            options = atts.extract_options!.to_options!
+            atts.each {|a| validations[a] << Validation.new(options[:on], &block)}
           end
 
-          def validates(a, &block)
-            curried = lambda{|record, attr, value| block.call(record, value)}
+          def validates(a, options = Hash.new, &block)
+            curried = Validation.new(options[:on]) {|record, attr, value| block.call(record, value)}
             validations[a] << curried
           end
 
@@ -143,7 +145,8 @@ module Helene
               :accept => '1'
             }.merge!(atts.extract_options!)
             
-            validates_each(*atts) do |o, a, v|
+            args = atts + [{:on => opts[:on]}]
+            validates_each(*args) do |o, a, v|
               next if (v.nil? && opts[:allow_nil]) || (v.blank? && opts[:allow_blank])
               o.errors[a] << opts[:message] unless v == opts[:accept]
             end
@@ -156,7 +159,8 @@ module Helene
             
             atts.each { |a| attr_accessor :"#{a}_confirmation" }
             
-            validates_each(*atts) do |o, a, v|
+            args = atts + [{:on => opts[:on]}]
+            validates_each(*args) do |o, a, v|
               next if (v.nil? && opts[:allow_nil]) || (v.blank? && opts[:allow_blank])
               c = o.send(:"#{a}_confirmation")
               o.errors[a] << opts[:message] unless v == c
@@ -172,7 +176,8 @@ module Helene
               raise ArgumentError, "A regular expression must be supplied as the :with option of the options hash"
             end
             
-            validates_each(*atts) do |o, a, v|
+            args = atts + [{:on => opts[:on]}]
+            validates_each(*args) do |o, a, v|
               next if (v.nil? && opts[:allow_nil]) || (v.blank? && opts[:allow_blank])
               o.errors[a] << opts[:message] unless v.to_s =~ opts[:with]
             end
@@ -185,7 +190,8 @@ module Helene
               :wrong_length => 'is the wrong length'
             }.merge!(atts.extract_options!)
             
-            validates_each(*atts) do |o, a, v|
+            args = atts + [{:on => opts[:on]}]
+            validates_each(*args) do |o, a, v|
               next if (v.nil? && opts[:allow_nil]) || (v.blank? && opts[:allow_blank])
               if m = opts[:maximum]
                 o.errors[a] << (opts[:message] || opts[:too_long]) unless v && v.size <= m
@@ -215,7 +221,8 @@ module Helene
               Float(value) rescue Integer(value) rescue false
             end
             
-            validates_each(*atts) do |o, a, v|
+            args = atts + [{:on => opts[:on]}]
+            validates_each(*args) do |o, a, v|
               next if (v.nil? && opts[:allow_nil]) || (v.blank? && opts[:allow_blank])
               #o.errors[a] << opts[:message] unless v.to_s =~ re
               o.errors[a] << opts[:message] unless number[v]
@@ -227,7 +234,8 @@ module Helene
               :message => 'is not present',
             }.merge!(atts.extract_options!)
             
-            validates_each(*atts) do |o, a, v|
+            args = atts + [{:on => opts[:on]}]
+            validates_each(*args) do |o, a, v|
               o.errors[a] << opts[:message] unless v && !v.blank?
             end
           end
