@@ -222,8 +222,21 @@ module Helene
                 @#{ name }_record =   nil if forcing
                 @#{ name }_record ||= #{ name }_association.get(self, *args, &block)
               end
+
               def #{ name }=(value)
                 #{ name }_association.set(self, value)
+              end
+
+              def build_#{ name }(attributes = {})
+                record         = #{ class_name }.new(attributes)
+                self.#{ name } = record
+                record
+              end
+
+              def create_#{ name }(attributes = {})
+                record = build_#{ name }(attributes)
+                record.save
+                record
               end
               # attribute #{ foreign_key.inspect }, :string, :null => #{ !!options[:null] }
             __
@@ -293,6 +306,18 @@ module Helene
                   end
                 end
                 self.#{ pluralized } = [value]
+              end
+
+              def build_#{ name }(attributes = {})
+                record         = #{ class_name }.new(attributes)
+                self.#{ name } = record
+                record
+              end
+
+              def create_#{ name }(attributes = {})
+                record = build_#{ name }(attributes)
+                record.save
+                record
               end
             __
           end
