@@ -154,7 +154,7 @@ module Helene
               record = parent_class.new(attributes)
               record.send("#{ foreign_type }=", parent_type) if foreign_type
               record.send("#{ foreign_key }=", parent_id)
-              self << record
+              self.push(record)
               record
             end
 
@@ -162,8 +162,12 @@ module Helene
               Array(records).flatten.each do |record|
                 record.send("#{ foreign_type }=", parent_type) if foreign_type
                 record.send("#{ foreign_key }=", parent_id)
-                self << record
+                self.push(record)
               end
+            end
+            
+            def <<(record)
+              associate(record)
             end
 
             def create(attributes = {})
@@ -254,7 +258,7 @@ module Helene
 
             @base.module_eval {
               unless instance_methods.include?(pluralized)
-                has_many(base, pluralized, options, &block)
+                has_many(pluralized, options, &block)
               end
             }
 
@@ -270,6 +274,7 @@ module Helene
               def #{ name }=(value)
                 if #{ name }()
                   # replace this record according to dependent rules
+                  
                 else
                   self.#{ pluralized } = [value]
                 end

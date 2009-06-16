@@ -17,17 +17,15 @@ namespace 'test' do
 
   desc 'run integration tests'
     task 'integration' do
+      file = ENV["FILE"]
       # test_loader 'test/integration/setup.rb'
       # open($test_integration_setup_guard, 'w'){|fd| fd.puts Time.now.utc.iso8601(2) }
 
-      %w[
-        sdb/base
-      ].each do |basename|
-
-        #test_loader('test/integration/begin.rb', :require_auth => true)
+      Dir.glob("test/integration/sdb/*.rb") do |test_file|
+        next unless file.nil? or test_file =~ /#{Regexp.escape(file)}(?:\.rb)?\z/
 
         begin
-          test_loader "test/integration/#{ basename }.rb", :require_auth => true
+          test_loader test_file, :require_auth => true
         ensure
           #test_loader('test/integration/ensure.rb', :require_auth => true)
         end
