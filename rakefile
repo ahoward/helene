@@ -20,14 +20,11 @@ namespace 'test' do
       # test_loader 'test/integration/setup.rb'
       # open($test_integration_setup_guard, 'w'){|fd| fd.puts Time.now.utc.iso8601(2) }
 
-      %w[
-        sdb/base
-      ].each do |basename|
-
+      Dir.glob("test/integration/sdb/*.rb") do |test_file|
         #test_loader('test/integration/begin.rb', :require_auth => true)
 
         begin
-          test_loader "test/integration/#{ basename }.rb", :require_auth => true
+          test_loader test_file, :require_auth => true
         ensure
           #test_loader('test/integration/ensure.rb', :require_auth => true)
         end

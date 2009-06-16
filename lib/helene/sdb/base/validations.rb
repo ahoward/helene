@@ -83,6 +83,20 @@ module Helene
           end
         end
         
+        class Validation
+          def initialize(on = nil, &validate)
+            @on       = on
+            @validate = validate
+          end
+          
+          attr_reader :on
+          
+          def run(save_type, *args)
+            validate && validate[*args] if on.nil? ||
+                                           [:save, save_type].include?(on)
+          end
+        end
+        
         module ClassMethods
           def validations
             @validations ||= Hash.new {|h, k| h[k] = []}
