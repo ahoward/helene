@@ -31,7 +31,7 @@ module Helene
           nil
         end
 
-        def for(name)
+        def for(name, options = {})
           result = S3.interface.list_bucket(name.to_s)
           service = result.service
           owner = Owner.new(service[:owner_id], service[:owner_display_name]) # HACK - will always be nil
@@ -39,6 +39,14 @@ module Helene
           owner, grantees = RightAws::S3::Grantee.owner_and_grantees(bucket)
           bucket.owner = owner
           bucket
+        end
+
+        def new(*args, &block)
+          if args.size == 4
+            return super
+          else
+            Bucket.for(*args, &block)
+          end
         end
       end
 
@@ -78,7 +86,7 @@ module Helene
       end
 
       def root(*args, &block)
-        namespace(self, name='', *args, &block)
+        namespace('', *args, &block)
       end
 
       def namespace(name, *args, &block)
@@ -86,6 +94,7 @@ module Helene
       end
       alias_method 'namespaced', 'namespace'
       alias_method '/', 'namespace'
+
 
       class Namespace
         attr :bucket
@@ -106,7 +115,7 @@ module Helene
 
         def list options = {}
           options.to_options!
-          options[:prefix] ||= prefix
+          options[:prefix] ||= prefix unless prefix.blank?
           headers = options.delete(:headers)
           bucket.keys(options, headers)
         end

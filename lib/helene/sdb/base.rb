@@ -522,7 +522,7 @@ module Helene
 
               hash.each do |key, val|
                 key = key.to_s.to_sym
-                sdb_val = to_sdb(key, val)
+                sdb_val = to_condition(key, val)
                 re = %r/[:@]#{ key }/
                 query.gsub! re, sdb_val
               end
@@ -562,10 +562,10 @@ module Helene
                 end
                 case op
                   when '=', '!=', '>', '>=', '<', '<=', 'like', 'not like'
-                    list = value[1..-1].flatten.map{|val| to_sdb(key, val)}
+                    list = value[1..-1].flatten.map{|val| to_condition(key, val)}
                     "#{ op } #{ list.join(',') }"
                   when 'between'
-                    a, b, *ignored = value[1..-1].flatten.map{|val| to_sdb(key, val)}
+                    a, b, *ignored = value[1..-1].flatten.map{|val| to_condition(key, val)}
                     "between #{ a } and #{ b }"
                   when 'is null'
                     'is null'
@@ -573,11 +573,11 @@ module Helene
                     'is not null'
                   else # 'in'
                     value.shift if op == 'in'
-                    list = value.flatten.map{|val| to_sdb(key, val)}
+                    list = value.flatten.map{|val| to_condition(key, val)}
                     "in (#{ list.join(',') })"
                 end
               else
-                "= #{ to_sdb(key, value) }"
+                "= #{ to_condition(key, value) }"
               end
 
             lhs = "every(#{ lhs })" if every
@@ -608,10 +608,11 @@ module Helene
           "`#{ value.gsub(%r/`/, '``') }`"
         end
 
-        def to_sdb(attribute, value)
+        def to_condition(attribute, value)
           return value if Literal?(value)
+          return value.to_condition() if value.respond_to?(:to_condition)
           type = type_for(attribute)
-          value = type ? type.ruby_to_sdb(value) : value
+          value = type ? type.to_condition(value) : value
           escape_value(value)
         end
 

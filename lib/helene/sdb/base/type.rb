@@ -23,6 +23,10 @@ module Helene
             value==Sentinel.Nil ? nil : value
           end
 
+          def to_condition(value)
+            value==nil ? Sentinel.Nil : value
+          end
+
           def ruby_to_sdb_for(&block)
             block ||= lambda{|value| value}
             lambda{|value| value==nil ? Sentinel.Nil : block.call(value)}
@@ -31,6 +35,11 @@ module Helene
           def sdb_to_ruby_for(&block)
             block ||= lambda{|value| value}
             lambda{|value| value==Sentinel.Nil ? nil : block.call(value)}
+          end
+
+          def to_condition_for(&block)
+            block ||= lambda{|value| value}
+            lambda{|value| value==nil ? Sentinel.Nil : block.call(value)}
           end
 
           def array_of_string value
@@ -91,6 +100,7 @@ module Helene
           @name = name
           @ruby_to_sdb = Type.method(:ruby_to_sdb).to_proc
           @sdb_to_ruby = Type.method(:sdb_to_ruby).to_proc
+          @to_condition = nil
           instance_eval(&block)
         end
 
@@ -107,6 +117,14 @@ module Helene
             @sdb_to_ruby = Type.sdb_to_ruby_for(&block)
           else
             @sdb_to_ruby.call(value)
+          end
+        end
+
+        def to_condition(value=nil, &block)
+          if block
+            @to_condition = Type.to_condition_for(&block)
+          else
+            (@to_condition || @ruby_to_sdb).call(value)
           end
         end
 

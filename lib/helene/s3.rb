@@ -1,27 +1,30 @@
 module Helene
   module S3
     class << S3
+      def thread
+        Thread.current
+      end
+
       def establish_connection(aws_access_key_id=Helene.aws_access_key_id, aws_secret_access_key=Helene.aws_secret_access_key, options={})
         options.to_options!
-        @interface = RightAws::S3Interface.new(aws_access_key_id, aws_secret_access_key, options)
-        raise Error, 'Connection to S3 is not established' unless @interface
-        @s3g ||= RightAws::S3Generator.new(aws_access_key_id, aws_secret_access_key)
-        raise Error, 'Connection to S3 is not established' unless @s3g
+        thread[:helene_s3_interface] = RightAws::S3Interface.new(aws_access_key_id, aws_secret_access_key, options)
+        raise Error, 'Connection to S3 is not established' unless thread[:helene_s3_interface]
+
+        thread[:helene_s3_generator] = RightAws::S3Generator.new(aws_access_key_id, aws_secret_access_key)
+        raise Error, 'Connection to S3 is not established' unless thread[:helene_s3_generator]
       ensure
-        @interface.extend(ConnectionHack) if @interface
+        thread[:helene_s3_interface].extend(ConnectionHack) if thread[:helene_s3_interface]
       end
 
       def interface
-        @interface ||= nil
-        establish_connection unless @interface
-        @interface
+        establish_connection unless thread[:helene_s3_interface]
+        thread[:helene_s3_interface]
       end
       alias_method 'connection', 'interface'
 
       def s3g
-        @s3g ||= nil
-        establish_connection unless @s3g
-        @s3g
+        establish_connection unless thread[:helene_s3_generator]
+        thread[:helene_s3_generator]
       end
 
 # TODO - move this into right_aws_monkey_patches.rb

@@ -102,6 +102,10 @@ module Helene
             chunks.replace chunks.sort_by{|index, text| index}
             chunks.map!{|index, text| text}.join
           end
+
+          to_condition do |value|
+            value.to_s
+          end
         }
       end
     end
