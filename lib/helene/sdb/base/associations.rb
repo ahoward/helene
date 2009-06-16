@@ -79,12 +79,12 @@ module Helene
           def set(record, *records)
             list = record.send(name)
             case dependent
-              when :destroy_all
-                list.destroy
-              when :delete_all
+              when :destroy
+                list.destroy_all
+              when :delete
                 list.delete_all
-              when :nullify_all
-                list.nullify
+              when :nullify
+                list.nullify_all
             end
             list.associate(*records)
           end
@@ -201,7 +201,6 @@ module Helene
         class BelongsTo < Association
           attr :polymorphic
           attr :foreign_type
-          attr :foreign_key
 
           def initialize(base, name, options = {}, &block)
             super
@@ -251,8 +250,18 @@ module Helene
         end
 
         class HasOne < Association
+          attr :polymorphic
+          attr :foreign_type
+
           def initialize(base, name, options = {}, &block)
             super
+
+            @polymorphic ||= options[:polymorphic]
+
+            if @polymorphic
+              @foreign_type ||= "#{ @polymorphic }_type"
+              @foreign_key ||= "#{ @polymorphic }_id"
+            end
 
             pluralized = name.to_s.pluralize
 
@@ -272,12 +281,18 @@ module Helene
               end
 
               def #{ name }=(value)
-                if #{ name }()
-                  # replace this record according to dependent rules
-                  
-                else
-                  self.#{ pluralized } = [value]
+                if old = #{ name }()
+                  case dependent
+                  when :destroy
+                    old.destroy
+                  when :delete
+                    old.delete
+                  when :nullify
+                    old.send("#{ foreign_key }=",  nil)
+                    old.send("#{ foreign_type }=", nil) if #{ !!foreign_type }
+                  end
                 end
+                self.#{ pluralized } = [value]
               end
             __
           end
