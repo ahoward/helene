@@ -434,7 +434,8 @@ module Helene
 
         # build conditions
         #
-          conditions = (options[:conditions] || {}).to_options!
+          conditions = (options[:conditions] || {})
+          conditions.to_options! if conditions.is_a?(Hash)
           conditions = !conditions.blank? ? " WHERE #{ sql_conditions_for(options[:conditions]) }"   : ''
 
         # build order
