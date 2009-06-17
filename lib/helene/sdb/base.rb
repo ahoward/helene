@@ -721,6 +721,8 @@ module Helene
       attr_accessor 'attributes'
       attr_accessor 'attributes_before_sdb_to_ruby'
       alias_method 'item_name', 'id'
+      attr_accessor 'deleted'
+      alias_method 'deleted?', 'deleted'
 
       class Attributes < ::HashWithIndifferentAccess
         def Attributes.for(arg)
@@ -736,6 +738,8 @@ module Helene
         options = @args.extract_options!.to_options!
         @id = @args.size == 1 ? @args.shift : generate_id
         @new_record = !!!options.delete(:new_record)
+        @deleted = nil
+        @removed = nil
         @attributes = Attributes.new
         options.each do |name, value|
           meth = "#{name}="
@@ -955,24 +959,42 @@ module Helene
       end
       alias_method 'delete_values', 'delete_attributes'
 
-      def delete!
+      def delete_item
         connection.delete_item(domain, id)
         self
+      ensure
+        @removed = true
       end
+      alias_method 'remove!', 'delete_item'
 
+# TODO - need to consider how for pass the options along to children being
+# deleted along the way - first pass with @removed/@deleted
+#
       def delete(options = {})
-        updating do
-          options.to_options!
-          return delete! if options[:force]
-          attributes['deleted_at'] = Transaction.time
-          update!
+        options.to_options!
+        before_delete
+        if options[:force]||options[:remove]
+          delete_item
+        else
+          updating do
+            attributes['deleted_at'] = Transaction.time
+            update!
+          end
         end
+      ensure
+        @deleted = true
+        after_delete unless $!
       end
 
-      def destroy
+      def delete!(options = {})
+        delete(options.to_options.update(:force => true))
+      end
+
+      def destroy(options = {})
         before_destroy
-        delete
-        after_destroy
+        delete(options)
+      ensure
+        after_destroy unless $!
       end
 
     # virtual consistency

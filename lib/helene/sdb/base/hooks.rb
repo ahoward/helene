@@ -13,7 +13,9 @@ module Helene
         :before_save,
         :after_save,
         :before_destroy,
-        :after_destroy
+        :after_destroy,
+        :before_delete,
+        :after_delete
       ] unless defined?(HOOKS)
 
       class << Base
