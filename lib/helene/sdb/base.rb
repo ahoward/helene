@@ -738,8 +738,6 @@ module Helene
         options = @args.extract_options!.to_options!
         @id = @args.size == 1 ? @args.shift : generate_id
         @new_record = !!!options.delete(:new_record)
-        @deleted = nil
-        @removed = nil
         @attributes = Attributes.new
         options.each do |name, value|
           meth = "#{name}="
@@ -750,6 +748,8 @@ module Helene
           end
         end
         klass.attributes.each{|attribute| attribute.initialize_record(self)}
+        @deleted = attributes['deleted_at'] ? true : false
+        @removed = false
         after_initialize
       end
 
@@ -892,8 +892,8 @@ module Helene
         after_save unless raising_an_error?
       end
 
-      def save!
-        save(:raise => true)
+      def save!(options = {})
+        save(options.to_options.update(:raise => true))
       end
 
       def errors!
@@ -976,11 +976,10 @@ module Helene
         if options[:force]||options[:remove]
           delete_item
         else
-          updating do
-            attributes['deleted_at'] = Transaction.time
-            update!
-          end
+          attributes['deleted_at'] = Transaction.time
+          save_without_validation
         end
+        self
       ensure
         @deleted = true
         after_delete unless $!
@@ -1022,7 +1021,7 @@ module Helene
         self.attributes.replace(sdb_to_ruby(sdb_attributes))
       end
 
-      def virtually_save(ruby_attributes)
+      def virtually_save(ruby_attributes=self.attributes)
         #return unless perform_virtual_consistency?
         sdb_attributes = ruby_to_sdb(ruby_attributes)
         virtually_load(sdb_attributes)
