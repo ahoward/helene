@@ -323,27 +323,28 @@ module Helene
           log(:debug){ "execute_select <- #{ args.inspect }" }
           options = args.extract_options!.to_options!
 
+        # yank out specical options used for recurion, formatting, and
+        # following huge queries.  none of these affect sql generation
+        #
           accum = options.delete(:accum) || OpenStruct.new(:items => [], :count => 0)
           raw = options.delete(:raw)
-#p :options => options
           @next_token = options.delete(:next_token)
 
-        # limit/arity
+        # handle limts > amazon's threshold specially - we'll be batching them
         #
           limit = Integer(options[:limit]) if options.has_key?(:limit)
           if limit and limit > 2500
             options[:limit] = 2500
           end
-          limit = 1 if args.first.to_s
           
-          sql = sql_for_select(*[args, options].flatten, &block)
-          log(:debug){ "execute_select -> #{ sql.inspect }" }
-#p :sql=>sql
-
+        # detect the arity of the result set, also set implied limit (:first)
+        # and go ahead and recurse for queries that are large sets of ids
+        #
           case args.first.to_s
             when "", "all"
               result_arity = -1
             when "first"
+              limit = 1
               result_arity = 1
             else
               result_arity = args.first.is_a?(Array) ? -1 : 1
@@ -354,20 +355,25 @@ module Helene
                   ids.each_slice(20){|slice| execute_select(*[slice, options], &block)}
                 else
                   records = ids.threadify(4, :each_slice, 20){|slice| execute_select(*[slice, options])}.flatten
-                  # records = ids.each_slice(20){|slice| execute_select(*[slice, options].flatten)}.flatten
                   return(limit ? records[0,limit] : records)
                 end
               end
           end
 
+        # generate the sql and get the results
+        #
+          sql = sql_for_select(*[args.dup, options.dup].flatten, &block)
+          log(:debug){ "execute_select -> #{ sql.inspect }" }
           result = connection.select(sql, @next_token)
           @next_token = result[:next_token]
-#p :next_token => @next_token
           items = result[:items]
 
 
+        # unpack the results into models or hashes (iff :raw=>true).  iterate
+        # if a block was given while doing so to prevent creating un-needed
+        # objects
+        #
           result[:items].each do |hash|
-#p :hash=>hash
             item =
               unless raw
                 id, attributes = hash.shift
@@ -380,9 +386,12 @@ module Helene
             break if limit and accum.count >= limit
           end
 
+        # if a next_token was returned handle the recursion/following
+        # transparently for the user.  handle the specical case where amazon
+        # says there are 'more records' even though our client limit has been
+        # reached
+        #
           if @next_token
-#p accum.count
-#p limit
             if limit.nil?
               recurse = [
                 args,
@@ -400,6 +409,9 @@ module Helene
             end
           end
 
+        # finally, build the return value based on arity and limit (expecting
+        # a single result or many or none when iterating)
+        #
           if block
             accum.count
           else
