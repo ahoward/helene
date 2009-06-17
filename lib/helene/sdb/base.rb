@@ -1115,7 +1115,6 @@ module Helene
       end
 
       def to_param
-        id = self['id']
         id ? id : 'new'
       end
 
