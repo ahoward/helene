@@ -325,15 +325,20 @@ module Helene
 
           accum = options.delete(:accum) || OpenStruct.new(:items => [], :count => 0)
           raw = options.delete(:raw)
+#p :options => options
           @next_token = options.delete(:next_token)
 
+        # limit/arity
+        #
           limit = Integer(options[:limit]) if options.has_key?(:limit)
           if limit and limit > 2500
             options[:limit] = 2500
           end
-
+          limit = 1 if args.first.to_s
+          
           sql = sql_for_select(*[args, options].flatten, &block)
           log(:debug){ "execute_select -> #{ sql.inspect }" }
+#p :sql=>sql
 
           case args.first.to_s
             when "", "all"
@@ -357,10 +362,12 @@ module Helene
 
           result = connection.select(sql, @next_token)
           @next_token = result[:next_token]
+#p :next_token => @next_token
           items = result[:items]
 
 
           result[:items].each do |hash|
+#p :hash=>hash
             item =
               unless raw
                 id, attributes = hash.shift
@@ -374,6 +381,8 @@ module Helene
           end
 
           if @next_token
+#p accum.count
+#p limit
             if limit.nil?
               recurse = [
                 args,
