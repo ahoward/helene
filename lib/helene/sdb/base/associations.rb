@@ -242,7 +242,14 @@ module Helene
               end
 
               def #{ name }=(value)
-                #{ name }_association.set(self, value)
+                record =
+                  case value
+                    when Hash
+                      build_#{ name }(value)
+                    when Base
+                      value
+                  end
+                #{ name }_association.set(self, record)
               end
 
               def build_#{ name }(attributes = {})
@@ -256,7 +263,6 @@ module Helene
                 record.save
                 record
               end
-              # attribute #{ foreign_key.inspect }, :string, :null => #{ !!options[:null] }
             __
             filename = __FILE__
             eval code, @base.module_eval('binding'), filename, lineno
@@ -328,7 +334,17 @@ module Helene
                     old.send("#{ foreign_type }=", nil) if #{ !!foreign_type }
                   end
                 end
-                self.#{ pluralized } = [value]
+
+                list = #{ pluralized }()
+
+                case value
+                  when Hash
+                    list.build(value)
+                  when Base
+                    list.associate(value)
+                  when Array
+                    list.associate(*value)
+                end
               end
 
               def build_#{ name }(attributes = {})
