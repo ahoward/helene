@@ -1,10 +1,10 @@
 module Helene
   module S3
     class Bucket < RightAws::S3::Bucket
-      Owner = RightAws::S3::Owner
-      Key = RightAws::S3::Key
-      Grantee = RightAws::S3::Grantee
-      S3Generator = RightAws::S3Generator
+      #Bucket::Owner = RightAws::S3::Owner
+      #Bucket::Key = RightAws::S3::Key
+      #Bucket::Grantee = RightAws::S3::Grantee
+      #Bucket::S3Generator = RightAws::S3Generator
 
       class Error < Helene::Error; end
 
@@ -107,7 +107,7 @@ module Helene
 
 
       class Namespace
-        class Key < ::RightAws::S3::Key
+        module KeyMethods
         end
 
         attr :bucket
