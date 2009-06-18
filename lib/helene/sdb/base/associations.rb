@@ -59,7 +59,7 @@ module Helene
 
             @foreign_key ||= (options[:foreign_key] || @base.name.foreign_key).to_s
 
-            @base.module_eval <<-__
+            lineno, code = __LINE__ + 1, <<-__
               def #{ name }(*args, &block)
                 association = #{ name }_association()
                 @#{ name } ||= nil
@@ -74,6 +74,8 @@ module Helene
                 association.set(self, *values)
               end
             __
+            filename = __FILE__
+            eval code, @base.module_eval('binding'), filename, lineno
           end
 
           def get(record, *args, &block)
@@ -218,7 +220,7 @@ module Helene
 
             @foreign_key ||= options[:foreign_key] || class_name.foreign_key
 
-            @base.module_eval <<-__
+            lineno, code = __LINE__ + 1, <<-__
               def #{ name }(*args, &block)
                 @#{ name }_record ||= nil
                 options = args.extract_options!.to_options!
@@ -244,6 +246,8 @@ module Helene
               end
               # attribute #{ foreign_key.inspect }, :string, :null => #{ !!options[:null] }
             __
+            filename = __FILE__
+            eval code, @base.module_eval('binding'), filename, lineno
           end
 
           def get(record, *args, &block)
@@ -269,6 +273,7 @@ module Helene
         class HasOne < Association
           attr :polymorphic
           attr :foreign_type
+          attr :pluralized
 
           def initialize(base, name, options = {}, &block)
             super
@@ -280,7 +285,9 @@ module Helene
               @foreign_key ||= "#{ @polymorphic }_id"
             end
 
-            pluralized = name.to_s.pluralize
+            @foreign_key ||= (options[:foreign_key] || @base.name.foreign_key).to_s
+
+            @pluralized = pluralized = name.to_s.pluralize
 
             @base.module_eval {
               unless instance_methods.include?(pluralized)
@@ -288,7 +295,7 @@ module Helene
               end
             }
 
-            @base.module_eval <<-__
+            lineno, code = __LINE__ + 1, <<-__
               def #{ name }(*args, &block)
                 @#{ name } ||= nil
                 options = args.extract_options!.to_options!
@@ -299,12 +306,12 @@ module Helene
 
               def #{ name }=(value)
                 if old = #{ name }()
-                  case dependent
+                  case #{ dependent.inspect }
                   when :destroy
                     old.destroy
                   when :delete
                     old.delete
-                  when :nullify
+                  when :nullify, nil
                     old.send("#{ foreign_key }=",  nil)
                     old.send("#{ foreign_type }=", nil) if #{ !!foreign_type }
                   end
@@ -324,6 +331,8 @@ module Helene
                 record
               end
             __
+            filename = __FILE__
+            eval code, @base.module_eval('binding'), filename, lineno
           end
         end
 
