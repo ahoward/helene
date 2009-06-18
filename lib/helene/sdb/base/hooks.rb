@@ -4,6 +4,8 @@ module Helene
       HOOKS = [
         :before_initialize,
         :after_initialize,
+        :before_load,
+        :after_load,
         :before_create,
         :after_create,
         :before_update,

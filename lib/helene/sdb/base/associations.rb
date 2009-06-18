@@ -37,6 +37,10 @@ module Helene
           @associated_class ||= class_name.constantize
         end
 
+        def initialize_record(record)
+          :abstract
+        end
+
         class HasMany < Association
           attr :list
           attr :polymorphic

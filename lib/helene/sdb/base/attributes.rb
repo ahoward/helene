@@ -46,21 +46,17 @@ module Helene
 
         def initialize_record(record)
           unless record.attributes.has_key?(name)
-            if has_default?
-              value =
-                if default.respond_to?(:call)
-                  record.instance_eval(&default)
-                else
-                  default
-                end
-              record.send("#{ name }=", value)
-            else
-              record.send("#{ name }=", nil)
-            end
+            value =
+              if has_default?
+                default.respond_to?(:call) ? record.instance_eval(&default) : default
+              else
+                nil
+              end
+            record.attributes[name] = value
           end
 
           if type.sti?
-            record.attributes[name] ||= record.class.name
+            record.attributes[name] = record.class.name
           end
         end
       end
