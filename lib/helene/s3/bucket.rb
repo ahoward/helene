@@ -90,19 +90,35 @@ module Helene
       end
 
       def namespace(name, *args, &block)
-        Namespace.new(self, name, *args, &block)
+        namespace = Namespace.new(self, name, *args, &block)
+=begin
+        parts = name.to_s.gsub(%r/(^\/+|\/+$)/,'').gsub(%r/\/+/,'/').split(%r/\//)
+        part, *parts = parts
+        namespace = Namespace.new(self, part, *args, &block)
+        parts.each do |part|
+          namespace = Namespace.new(namespace, part, *args, &block)
+        end
+        namespace
+=end
       end
       alias_method 'namespaced', 'namespace'
       alias_method '/', 'namespace'
 
 
+
       class Namespace
+        class Key < ::RightAws::S3::Key
+        end
+
         attr :bucket
         attr :name
 
         def initialize bucket, name, options = {}
           @bucket = bucket
           @name = name.to_s
+          @name.sub! %r|^/+|, ''
+          @name.sub! %r|/+$|, ''
+          @name.sub! %r|/+|, '/'
         end
 
         alias_method 'prefix', 'name'
@@ -113,7 +129,7 @@ module Helene
         alias_method 'namespaced', 'namespace'
         alias_method '/', 'namespace'
 
-        def list options = {}
+        def keys options = {}
           options.to_options!
           options[:prefix] ||= prefix unless prefix.blank?
           headers = options.delete(:headers)
@@ -161,6 +177,15 @@ module Helene
           headers = options.delete(:headers) || {}
           options[:prefix] = name
           bucket.s3g.keys(options, expires, headers)
+        end
+
+        def ls(options = {})
+          options.to_options!
+          expires = options.delete(:expires) || 1.hour
+          headers = options.delete(:headers) || {}
+          keys.map do |key|
+            bucket.s3g.key(key).get(expires, headers)
+          end
         end
       end
 

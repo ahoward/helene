@@ -287,9 +287,9 @@ module Helene
       # create an existing record
       #
         def old(id, attributes = {})
-          record = class_for(attributes).new(id, attributes)
+          record = class_for(attributes).new(id, attributes.update(:old => true))
           record.sdb_to_ruby!
-          record.mark_as_old!
+          #record.mark_as_old!
           record
         end
 
@@ -755,19 +755,14 @@ module Helene
     #
       def initialize(*args, &block)
         @args, @block = args, block
-        before_initialize
         options = @args.extract_options!.to_options!
+        @new_record = true
+        @new_record = !!!options.delete(:old) if options.has_key?(:old)
+        @new_record = !!!options.delete(:new_record) if options.has_key?(:new_record)
         @id = @args.size == 1 ? @args.shift : generate_id
-        @new_record = !!!options.delete(:new_record)
-        @attributes = Attributes.new
-        options.each do |name, value|
-          meth = "#{name}="
-          if respond_to? meth
-            self.send(meth, value)
-          else
-            @attributes[name] = value
-          end
-        end
+
+        before_initialize
+        @attributes = Attributes.for(options)
         klass.attributes.each{|attribute| attribute.initialize_record(self)}
         @deleted = attributes['deleted_at'] ? true : false
         @removed = false
