@@ -66,33 +66,33 @@ module Helene
                 options = args.extract_options!.to_options!
                 forcing = options.delete(:force)
                 @#{ name } =  nil if forcing
-                @#{ name } ||= association.get(self, *args, &block)
+                @#{ name } ||= association.list_for(self, *args, &block)
               end
 
               def #{ name }=(*values)
-                association = #{ name }_association()
-                association.set(self, *values)
+                value = values.first
+
+                list = #{ name }()
+                list.clear!
+
+                case value
+                  when Hash
+                    list.build(value)
+                  when Array
+                    list.associate(*value)
+                  when Base
+                    list.associate(value)
+                  else
+                    list.associate(*values.flatten)
+                end
               end
             __
             filename = __FILE__
             eval code, @base.module_eval('binding'), filename, lineno
           end
 
-          def get(record, *args, &block)
+          def list_for(record, *args, &block)
             List.new(record, self, *args, &block)
-          end
-
-          def set(record, *records)
-            list = record.send(name)
-            case dependent
-              when :destroy
-                list.destroy_all
-              when :delete
-                list.delete_all
-              when :nullify
-                list.nullify_all
-            end
-            list.associate(*records)
           end
 
           class List < ::Array
@@ -117,7 +117,7 @@ module Helene
               parent.id
             end
 
-            %w[ foreign_type foreign_key associated_class ].each do |attr|
+            %w[ foreign_type foreign_key associated_class dependent ].each do |attr|
               module_eval <<-__
                 def #{ attr }(*a, &b) association.send('#{ attr }', *a, &b) end
                 def #{ attr }=(*a, &b) association.send('#{ attr }=', *a, &b) end
@@ -137,6 +137,18 @@ module Helene
                 record.send("#{ foreign_key }=", nil)
                 record.send("#{ foreign_type }=", nil) if foreign_type
               end
+            end
+
+            def clear!
+              case dependent
+                when :destroy
+                  destroy_all
+                when :delete
+                  delete_all
+                when :nullify, nil
+                  nullify_all
+              end
+              clear
             end
 
             def reload
