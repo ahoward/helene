@@ -126,6 +126,12 @@ them.
       @@params = params
     end
 
+    module NullLogger
+      def respond_to?(*a, &b) true end
+      def method_missing(m, *a, &b) end
+      extend self
+    end
+
     #------------------
     # instance methods
     #------------------
@@ -156,11 +162,14 @@ them.
       @params[:http_connection_retry_delay]  ||= @@params[:http_connection_retry_delay]
       @http   = nil
       @server = nil
-      @logger = get_param(:logger) ||
-                (RAILS_DEFAULT_LOGGER if defined?(RAILS_DEFAULT_LOGGER)) ||
-                Logger.new(STDOUT)
+      @logger = get_param(:logger) || NullLogger
+      @ca_file = get_param(:ca_file)
       @state = {}
       @eof = {}
+    end
+
+    def log(*args, &block)
+      @logger.send(*args, &block) if @logger
     end
 
     def prevent_mt_use!
@@ -290,8 +299,7 @@ them.
         begin
           request.body_stream.pos = offset
         rescue Exception => e
-          @logger.warn("Failed file pointer reset; aborting HTTP retries." +
-                             " -- #{err_header} #{e.inspect}")
+          log(:warn, "Failed file pointer reset; aborting HTTP retries. -- #{err_header} #{e.inspect}")
           raise e
         end
       end
@@ -307,7 +315,7 @@ them.
       @port     = request_params[:port]
       @protocol = request_params[:protocol]
 
-      @logger.info("Opening new #{@protocol.upcase} connection to #@server:#@port")
+      log(:info, "Opening new #{@protocol.upcase} connection to #@server:#@port")
       @http = Net::HTTP.new(@server, @port)
       @http.open_timeout = @params[:http_connection_open_timeout]
       @http.read_timeout = @params[:http_connection_read_timeout]
@@ -317,15 +325,16 @@ them.
           code = x509_store_ctx.error
           msg = x509_store_ctx.error_string
             #debugger
-          @logger.warn("##### #{@server} certificate verify failed: #{msg}") unless code == 0
+          log(:warn, "##### #{@server} certificate verify failed: #{msg}") unless code == 0
           true
         }
         @http.use_ssl = true
         ca_file = get_param(:ca_file)
         if ca_file
-          @http.verify_mode     = OpenSSL::SSL::VERIFY_PEER
-          @http.verify_callback = verifyCallbackProc
-          @http.ca_file         = ca_file
+          #@http.verify_mode     = OpenSSL::SSL::VERIFY_PEER
+          @http.verify_mode     = OpenSSL::SSL::VERIFY_NONE
+          #@http.verify_callback = verifyCallbackProc
+          #@http.ca_file         = ca_file
         end
       end
       # open connection
@@ -348,6 +357,7 @@ them.
 =end
     def request(request_params, &block)
       prevent_mt_use!
+      log_request(request_params) rescue nil
       # We save the offset here so that if we need to retry, we can return the file pointer to its initial position
       mypos = get_fileptr_offset(request_params)
       loop do
@@ -357,7 +367,7 @@ them.
           # store the message (otherwise it will be lost after error_reset and
           # we will raise an exception with an empty text)
           banana_message_text = banana_message
-          @logger.warn("#{err_header} re-raising same error: #{banana_message_text} " +
+          log(:warn, "#{err_header} re-raising same error: #{banana_message_text} " +
                       "-- error count: #{error_count}, error age: #{Time.now.to_i - error_time.to_i}")
           exception = get_param(:exception) || RuntimeError
           raise exception.new(banana_message_text)
@@ -383,6 +393,7 @@ them.
           # bad boy.
           setup_streaming(request)
           response = @http.request(request, &block)
+          log_response(response) rescue nil
 
           error_reset
           eof_reset
@@ -399,13 +410,13 @@ them.
 
         # EOFError means the server closed the connection on us.
         rescue EOFError => e
-          @logger.debug("#{err_header} server #{@server} closed connection")
+          log(:debug, "#{err_header} server #{@server} closed connection")
           @http = nil
 
             # if we have waited long enough - raise an exception...
           if raise_on_eof_exception?
             exception = get_param(:exception) || RuntimeError
-            @logger.warn("#{err_header} raising #{exception} due to permanent EOF being received from #{@server}, error age: #{Time.now.to_i - eof_time.to_i}")
+            log(:warn, "#{err_header} raising #{exception} due to permanent EOF being received from #{@server}, error age: #{Time.now.to_i - eof_time.to_i}")
             raise exception.new("Permanent EOF is being received from #{@server}.")
           else
               # ... else just sleep a bit before new retry
@@ -417,7 +428,7 @@ them.
           @http = nil
           # if ctrl+c is pressed - we have to reraise exception to terminate proggy
           if e.is_a?(Interrupt) && !( e.is_a?(Errno::ETIMEDOUT) || e.is_a?(Timeout::Error))
-            @logger.debug( "#{err_header} request to server #{@server} interrupted by ctrl-c")
+            log(:debug, "#{err_header} request to server #{@server} interrupted by ctrl-c")
             raise
           elsif e.is_a?(ArgumentError) && e.message.include?('wrong number of arguments (5 for 4)')
             # seems our net_fix patch was overriden...
@@ -426,7 +437,7 @@ them.
           end
           # oops - we got a banana: log it
           error_add(e.message)
-          @logger.warn("#{err_header} request failure count: #{error_count}, exception: #{e.inspect}")
+          log(:warn, "#{err_header} request failure count: #{error_count}, exception: #{e.inspect}")
 
           # We will be retrying the request, so reset the file pointer
           reset_fileptr_offset(request, mypos)
@@ -435,11 +446,40 @@ them.
       end
     end
 
+    def log_request(request_params)
+      return if logger.nil?
+      return unless logger.debug?
+      logger.debug{ "HttpConnection - request_params=#{ request_params.inspect }" }
+      if((request = request_params[:request]))
+        method = request.method
+        path = request.path
+        #body = (request.body.size > 42 ? (request.body[0,42] + '...') : request.body) if request.body
+        body = request.body
+        logger.debug{ "HttpConnection - request.method=#{ method.inspect }" }
+        logger.debug{ "HttpConnection - request.path=#{ path.inspect }" }
+        logger.debug{ "HttpConnection - request.body=#{ body.inspect }" }
+      end
+    end
+
+    def log_response(response)
+      return if logger.nil?
+      return unless logger.debug?
+      if response
+        code = response.code
+        message = response.message
+        #body = (response.body.size > 42 ? (response.body[0,42] + '...') : response.body) if response.body
+        body = response.body
+        logger.debug{ "HttpConnection - response.code=#{ code.inspect }" }
+        logger.debug{ "HttpConnection - response.message=#{ message.inspect }" }
+        logger.debug{ "HttpConnection - response.body=#{ body.inspect }" }
+      end
+    end
+
     def finish(reason = '')
       prevent_mt_use!
       if @http && @http.started?
         reason = ", reason: '#{reason}'" unless reason.blank?
-        @logger.info("Closing #{@http.use_ssl? ? 'HTTPS' : 'HTTP'} connection to #{@http.address}:#{@http.port}#{reason}")
+        log(:info, "Closing #{@http.use_ssl? ? 'HTTPS' : 'HTTP'} connection to #{@http.address}:#{@http.port}#{reason}")
         @http.finish rescue nil  # it's possible for a Thread to reset this before we can finish it (so it wouldn't be started)
       end
     end

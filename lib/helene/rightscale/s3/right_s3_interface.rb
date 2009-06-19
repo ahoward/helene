@@ -987,11 +987,16 @@ module RightAws
       end
     end
 
-    class S3ListBucketParser < RightAWSParser  # :nodoc:
+    class S3ListBucketParser < RightAws::RightAWSParser  # :nodoc:
       def reset
         @result      = []
         @service     = {}
         @current_key = {}
+
+        class << @result
+          attr_accessor :service
+        end
+        @result.service = @service
       end
       def tagstart(name, attributes)
         @current_key = {} if name == 'Contents'
@@ -999,12 +1004,12 @@ module RightAws
       def tagend(name)
         case name
             # service info
-          when 'Name'        ; @service['name']         = @text
-          when 'Prefix'      ; @service['prefix']       = @text
-          when 'Marker'      ; @service['marker']       = @text
-          when 'MaxKeys'     ; @service['max-keys']     = @text
-          when 'Delimiter'   ; @service['delimiter']    = @text
-          when 'IsTruncated' ; @service['is_truncated'] = (@text =~ /false/ ? false : true)
+          when 'Name'        ; @service[:name]         = @text
+          when 'Prefix'      ; @service[:prefix]       = @text
+          when 'Marker'      ; @service[:marker]       = @text
+          when 'MaxKeys'     ; @service[:max_keys]     = @text
+          when 'Delimiter'   ; @service[:delimiter]    = @text
+          when 'IsTruncated' ; @service[:is_truncated] = (@text =~ /false/ ? false : true)
             # key data
           when 'Key'         ; @current_key[:key]                = @text
           when 'LastModified'; @current_key[:last_modified]      = @text

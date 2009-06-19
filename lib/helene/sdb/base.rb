@@ -2,8 +2,6 @@
 module Helene
   module Sdb
     class Base
-      load 'helene/right_http_connection_monkey_patches.rb'
-      load 'helene/right_aws_monkey_patches.rb'
       load 'helene/sdb/base/error.rb'
       load 'helene/sdb/base/logging.rb'
       load 'helene/sdb/base/connection.rb'

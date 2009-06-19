@@ -1,10 +1,148 @@
 module Helene
   module S3
+    class Bucket
+      attr_reader :s3, :name, :owner, :creation_date
+      
+      def self.create(s3, name, create=false, perms=nil, headers={}) 
+        s3.bucket(name, create, perms, headers)
+      end
+
+      def initialize(s3, name, creation_date=nil, owner=nil)
+        @s3    = s3
+        @name  = name
+        @owner = owner
+        @creation_date = creation_date
+        if @creation_date && !@creation_date.is_a?(Time)
+          @creation_date = Time.parse(@creation_date)
+        end
+      end
+      
+      def to_s
+        @name.to_s
+      end
+      alias_method :full_name, :to_s
+      
+      def public_link
+        params = @s3.interface.params
+        "#{params[:protocol]}://#{params[:server]}:#{params[:port]}/#{full_name}"
+      end
+      
+      def location
+        @location ||= @s3.interface.bucket_location(@name)
+      end
+      
+      def logging_info
+        @s3.interface.get_logging_parse(:bucket => @name)
+      end
+      
+      def enable_logging(params)
+        AwsUtils.mandatory_arguments([:targetbucket, :targetprefix], params)
+        AwsUtils.allow_only([:targetbucket, :targetprefix], params)
+        xmldoc = "<?xml version=\"1.0\" encoding=\"UTF-8\"?><BucketLoggingStatus xmlns=\"http://doc.s3.amazonaws.com/2006-03-01\"><LoggingEnabled><TargetBucket>#{params[:targetbucket]}</TargetBucket><TargetPrefix>#{params[:targetprefix]}</TargetPrefix></LoggingEnabled></BucketLoggingStatus>"
+        @s3.interface.put_logging(:bucket => @name, :xmldoc => xmldoc)
+      end
+      
+      def disable_logging
+        xmldoc = "<?xml version=\"1.0\" encoding=\"UTF-8\"?><BucketLoggingStatus xmlns=\"http://doc.s3.amazonaws.com/2006-03-01\"></BucketLoggingStatus>"
+        @s3.interface.put_logging(:bucket => @name, :xmldoc => xmldoc)
+      end
+
+      def keys(options={}, head=false)
+        keys_and_service(options, head)[0]
+      end
+
+      def keys_and_service(options={}, head=false)
+        opt = {}; options.each{ |key, value| opt[key.to_s] = value }
+        service_data = {}
+        thislist = {}
+        list = []
+        @s3.interface.incrementally_list_bucket(@name, opt) do |thislist|
+          thislist[:contents].each do |entry|
+            owner = Owner.new(entry[:owner_id], entry[:owner_display_name])
+            key = Key.new(self, entry[:key], nil, {}, {}, entry[:last_modified], entry[:e_tag], entry[:size], entry[:storage_class], owner)
+            key.head if head
+            list << key
+          end
+        end
+        thislist.each_key do |key|
+          service_data[key] = thislist[key] unless (key == :contents || key == :common_prefixes)
+        end
+        [list, service_data]
+      end
+
+      def key(key_name, head=false)
+        raise 'Key name can not be empty.' if key_name.blank?
+        key_instance = nil
+          # if this key exists - find it ....
+        keys({'prefix'=>key_name}, head).each do |key|
+          if key.name == key_name.to_s
+            key_instance = key
+            break
+          end
+        end
+          # .... else this key is unknown
+        unless key_instance
+          key_instance = Key.create(self, key_name.to_s)
+        end
+        key_instance
+      end
+      
+      def put(key, data=nil, meta_headers={}, perms=nil, headers={})
+        key = Key.create(self, key.to_s, data, meta_headers) unless key.is_a?(Key) 
+        key.put(data, perms, headers)
+      end
+
+      def get(key, headers={})
+        key = Key.create(self, key.to_s) unless key.is_a?(Key)
+        key.get(headers)
+      end
+
+      def rename_key(old_key_or_name, new_name)
+        old_key_or_name = Key.create(self, old_key_or_name.to_s) unless old_key_or_name.is_a?(Key)
+        old_key_or_name.rename(new_name)
+        old_key_or_name
+      end
+
+      def copy_key(old_key_or_name, new_key_or_name)
+        old_key_or_name = Key.create(self, old_key_or_name.to_s) unless old_key_or_name.is_a?(Key)
+        old_key_or_name.copy(new_key_or_name)
+      end
+      
+      def move_key(old_key_or_name, new_key_or_name)
+        old_key_or_name = Key.create(self, old_key_or_name.to_s) unless old_key_or_name.is_a?(Key)
+        old_key_or_name.move(new_key_or_name)
+      end
+      
+      def clear
+        @s3.interface.clear_bucket(@name)  
+      end
+
+      def delete_folder(folder, separator='/')
+        @s3.interface.delete_folder(@name, folder, separator)
+      end
+      
+      def delete(force=false)
+        force ? @s3.interface.force_delete_bucket(@name) : @s3.interface.delete_bucket(@name)
+      end
+
+      def grantees
+        Grantee::grantees(self)
+      end
+    end
+  end
+end
+
+__END__
+module Helene
+  module S3
     class Bucket < RightAws::S3::Bucket
-      #Bucket::Owner = RightAws::S3::Owner
-      #Bucket::Key = RightAws::S3::Key
-      #Bucket::Grantee = RightAws::S3::Grantee
-      #Bucket::S3Generator = RightAws::S3Generator
+      Bucket.const_set(:Owner, RightAws::S3::Owner)
+      # Bucket.const_set(:Key, RightAws::S3::Key)
+      Bucket.const_set(:Grantee, RightAws::S3::Grantee)
+      Bucket.const_set(:S3Generator, RightAws::S3Generator)
+
+      class Key < RightAws::S3::Key
+      end
 
       class Error < Helene::Error; end
 

@@ -171,6 +171,12 @@ module RightAws
   end
 
   module RightAwsBaseInterface
+    module NullLogger
+      def respond_to?(*a, &b) true end
+      def method_missing(m, *a, &b) end
+      extend self
+    end
+
     DEFAULT_SIGNATURE_VERSION = '2'
     
     @@caching = false
@@ -223,9 +229,7 @@ module RightAws
         @params[:protocol] ||= service_info[:default_protocol]
       end
       @params[:multi_thread] ||= defined?(AWS_DAEMON)
-      @logger = @params[:logger]
-      @logger = RAILS_DEFAULT_LOGGER if !@logger && defined?(RAILS_DEFAULT_LOGGER)
-      @logger = Logger.new(STDOUT)   if !@logger
+      @logger = @params[:logger] || NullLogger
       @logger.info "New #{self.class.name} using #{@params[:multi_thread] ? 'multi' : 'single'}-threaded mode"
       @error_handler = nil
       @cache = {}
