@@ -12,6 +12,16 @@ module Helene
           end
         }
 
+        type(:symbol){
+          ruby_to_sdb do |value|
+            value.to_s.to_sym.to_s
+          end
+
+          sdb_to_ruby do |value|
+            Array(value).first.to_s.to_sym
+          end
+        }
+
         type(:timestamp){
           ruby_to_sdb do |value|
             Time.parse(value.to_s).utc.iso8601(2)
