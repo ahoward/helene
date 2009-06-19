@@ -340,13 +340,21 @@ module Helene
           case args.first.to_s
             when "", "all"
               result_arity = -1
+              wants = :all
             when "first"
               limit = 1
               result_arity = 1
+              wants = :first
             else
-              result_arity = args.first.is_a?(Array) ? -1 : 1
               ids = args.flatten.compact
-              result_arity = -1 if ids.size > 1
+              raise ArgumentError, 'no ids' if ids.blank?
+              if(args.first.is_a?(Array) or ids.size > 1)
+                result_arity = -1
+                wants = :ids
+              else
+                result_arity = 1
+                wants = :id
+              end
               if ids.size > 20
                 if block
                   ids.each_slice(20){|slice| execute_select(*[slice, options], &block)}
@@ -414,7 +422,7 @@ module Helene
           else
             if result_arity == 1
               record = accum.items.first
-              raise RecordNotFound unless record
+              raise RecordNotFound if(record.nil? and wants==:id)
               record
             else
               limit ? accum.items[0,limit] : accum.items
