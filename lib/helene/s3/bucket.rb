@@ -1,59 +1,71 @@
 module Helene
   module S3
     class Bucket
-      attr_reader :s3, :name, :owner, :creation_date
-
-
       class << Bucket
-        def list
-          S3.interface.list_all_my_buckets.map! do |entry|
+        def interface
+          S3.interface
+        end
+
+        def list(&block)
+          list = []
+          interface.list_all_my_buckets.map! do |entry|
             owner = Owner.new(entry[:owner_id], entry[:owner_display_name])
-            new(S3, entry[:name], entry[:creation_date], owner)
+            bucket = allocate
+            name = entry[:name]
+            creation_date = entry[:creation_date]
+            options = {:interface => interface, :owner => owner, :creation_date => creation_date}
+            bucket.send(:initialize, name, options)
+            block ? block.all(bucket) : list.push(bucket)
           end
+          block ? nil : list
         end
         alias_method 'buckets', 'list'
 
-        def create(name, perms=nil, headers={})
-          bucket(name, create=true, perms, headers)
+        def create(name, headers = {})
+          interface.create_bucket(name, headers)
+          new(name)
         end
 
-        def bucket(name, create=false, perms=nil, headers={})
-          name = namespaced(name)
-          headers['x-amz-acl'] = perms if perms
-          S3.interface.create_bucket(name, headers) if create
-          list.each{|bucket| return bucket if bucket.name == name}
-          nil
-        end
-
-        def for(name, options = {})
+        def new(name, options = {})
           result = S3.interface.list_bucket(name.to_s)
           service = result.service
-          owner = Owner.new(service[:owner_id], service[:owner_display_name]) # HACK - will always be nil
-          bucket = new(S3, service[:name], service[:creation_date], owner)
-          owner, grantees = RightAws::S3::Grantee.owner_and_grantees(bucket)
+          owner = Owner.new(service[:owner_id], service[:owner_display_name])
+          bucket = allocate
+          name = service[:name]
+          options[:interface] || S3.interface
+          options[:owner] ||= owner
+          options[:creation_date] ||= service[:creation_date]
+          bucket.send(:initialize, name, options)
+          owner, grantees = Grantee.owner_and_grantees(bucket)
           bucket.owner = owner
           bucket
         end
-
-        def new(*args, &block)
-          if args.size == 4
-            return super
-          else
-            Bucket.for(*args, &block)
-          end
-        end
+        alias_method 'for', 'new'
       end
-      
 
-      def initialize(s3, name, creation_date=nil, owner=nil)
-        @s3    = s3
-        @name  = name
-        @owner = owner
-        @creation_date = creation_date
+      attr_accessor :name
+      attr_accessor :interface
+      attr_accessor :owner
+      attr_accessor :creation_date
+      attr_accessor :prefix
+
+      def initialize(name, *args)
+        options = args.extract_options!.to_options!
+        @name  = name.to_s
+        @interface = options[:interface] || S3.interface
+        @owner = options[:owner]
+        @prefix = options[:prefix]
+        @creation_date = options[:creation_date]
         if @creation_date && !@creation_date.is_a?(Time)
           @creation_date = Time.parse(@creation_date)
         end
       end
+
+
+# TODO 
+# TODO 
+# TODO 
+# TODO 
       
       def to_s
         @name.to_s
@@ -61,28 +73,28 @@ module Helene
       alias_method :full_name, :to_s
       
       def public_link
-        params = @s3.interface.params
+        params = @interface.params
         "#{params[:protocol]}://#{params[:server]}:#{params[:port]}/#{full_name}"
       end
       
       def location
-        @location ||= @s3.interface.bucket_location(@name)
+        @location ||= @interface.bucket_location(@name)
       end
       
       def logging_info
-        @s3.interface.get_logging_parse(:bucket => @name)
+        @interface.get_logging_parse(:bucket => @name)
       end
       
       def enable_logging(params)
         AwsUtils.mandatory_arguments([:targetbucket, :targetprefix], params)
         AwsUtils.allow_only([:targetbucket, :targetprefix], params)
         xmldoc = "<?xml version=\"1.0\" encoding=\"UTF-8\"?><BucketLoggingStatus xmlns=\"http://doc.s3.amazonaws.com/2006-03-01\"><LoggingEnabled><TargetBucket>#{params[:targetbucket]}</TargetBucket><TargetPrefix>#{params[:targetprefix]}</TargetPrefix></LoggingEnabled></BucketLoggingStatus>"
-        @s3.interface.put_logging(:bucket => @name, :xmldoc => xmldoc)
+        @interface.put_logging(:bucket => @name, :xmldoc => xmldoc)
       end
       
       def disable_logging
         xmldoc = "<?xml version=\"1.0\" encoding=\"UTF-8\"?><BucketLoggingStatus xmlns=\"http://doc.s3.amazonaws.com/2006-03-01\"></BucketLoggingStatus>"
-        @s3.interface.put_logging(:bucket => @name, :xmldoc => xmldoc)
+        @interface.put_logging(:bucket => @name, :xmldoc => xmldoc)
       end
 
       def keys(options={}, head=false)
@@ -94,7 +106,7 @@ module Helene
         service_data = {}
         thislist = {}
         list = []
-        @s3.interface.incrementally_list_bucket(@name, opt) do |thislist|
+        @interface.incrementally_list_bucket(@name, opt) do |thislist|
           thislist[:contents].each do |entry|
             owner = Owner.new(entry[:owner_id], entry[:owner_display_name])
             key = Key.new(self, entry[:key], nil, {}, {}, entry[:last_modified], entry[:e_tag], entry[:size], entry[:storage_class], owner)
@@ -152,15 +164,15 @@ module Helene
       end
       
       def clear
-        @s3.interface.clear_bucket(@name)  
+        @interface.clear_bucket(@name)  
       end
 
       def delete_folder(folder, separator='/')
-        @s3.interface.delete_folder(@name, folder, separator)
+        @interface.delete_folder(@name, folder, separator)
       end
       
       def delete(force=false)
-        force ? @s3.interface.force_delete_bucket(@name) : @s3.interface.delete_bucket(@name)
+        force ? @interface.force_delete_bucket(@name) : @interface.delete_bucket(@name)
       end
 
       def grantees

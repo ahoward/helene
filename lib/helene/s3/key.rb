@@ -1,5 +1,5 @@
 module Helene
-  module Sdb
+  module S3
     class Key
       attr_reader   :bucket,  :name, :last_modified, :e_tag, :size, :storage_class, :owner
       attr_accessor :headers, :meta_headers
@@ -9,8 +9,8 @@ module Helene
         hash = headers.dup
         meta = {}
         hash.each do |key, value|
-          if key[/^#{S3Interface::AMAZON_METADATA_PREFIX}/]
-            meta[key.gsub(S3Interface::AMAZON_METADATA_PREFIX,'')] = value
+          if key[%r/^x-amz-meta-/]
+            meta[key.gsub('x-amz-meta-', '')] = value
             hash.delete(key)
           end
         end
@@ -23,7 +23,7 @@ module Helene
           if meta_header[/#{prefix}/]
             meta[meta_header] = value
           else
-            meta["#{S3Interface::AMAZON_METADATA_PREFIX}#{meta_header}"] = value
+            meta["x-amz-meta-#{meta_header}"] = value
           end
         end
         meta
@@ -60,7 +60,7 @@ module Helene
       end
         
       def public_link
-        params = @bucket.s3.interface.params
+        params = @bucket.interface.params
         "#{params[:protocol]}://#{params[:server]}:#{params[:port]}/#{full_name('/')}"
       end
          
@@ -70,7 +70,7 @@ module Helene
       end
       
       def get(headers={})
-        response = @bucket.s3.interface.get(@bucket.name, @name, headers)
+        response = @bucket.interface.get(@bucket.name, @name, headers)
         @data    = response[:object]
         @headers, @meta_headers = self.class.split_meta(response[:headers])
         refresh(false)
@@ -81,23 +81,23 @@ module Helene
         headers['x-amz-acl'] = perms if perms
         @data = data || @data
         meta  = self.class.add_meta_prefix(@meta_headers)
-        @bucket.s3.interface.put(@bucket.name, @name, @data, meta.merge(headers))
+        @bucket.interface.put(@bucket.name, @name, @data, meta.merge(headers))
       end
       
       def rename(new_name)
-        @bucket.s3.interface.rename(@bucket.name, @name, new_name)
+        @bucket.interface.rename(@bucket.name, @name, new_name)
         @name = new_name
       end
       
       def copy(new_key_or_name)
         new_key_or_name = Key.create(@bucket, new_key_or_name.to_s) unless new_key_or_name.is_a?(Key)
-        @bucket.s3.interface.copy(@bucket.name, @name, new_key_or_name.bucket.name, new_key_or_name.name)
+        @bucket.interface.copy(@bucket.name, @name, new_key_or_name.bucket.name, new_key_or_name.name)
         new_key_or_name
       end
 
       def move(new_key_or_name)
         new_key_or_name = Key.create(@bucket, new_key_or_name.to_s) unless new_key_or_name.is_a?(Key)
-        @bucket.s3.interface.move(@bucket.name, @name, new_key_or_name.bucket.name, new_key_or_name.name)
+        @bucket.interface.move(@bucket.name, @name, new_key_or_name.bucket.name, new_key_or_name.name)
         new_key_or_name
       end
       
@@ -118,17 +118,17 @@ module Helene
       end
 
       def head
-        @headers, @meta_headers = self.class.split_meta(@bucket.s3.interface.head(@bucket, @name))
+        @headers, @meta_headers = self.class.split_meta(@bucket.interface.head(@bucket, @name))
         true
       end
       
       def reload_meta
-        @meta_headers = self.class.split_meta(@bucket.s3.interface.head(@bucket, @name)).last
+        @meta_headers = self.class.split_meta(@bucket.interface.head(@bucket, @name)).last
       end
       
       def save_meta(meta_headers)
         meta = self.class.add_meta_prefix(meta_headers)
-        @bucket.s3.interface.copy(@bucket.name, @name, @bucket.name, @name, :replace, meta)
+        @bucket.interface.copy(@bucket.name, @name, @bucket.name, @name, :replace, meta)
         @meta_headers = self.class.split_meta(meta)[1]
       end
  
@@ -138,7 +138,7 @@ module Helene
       
       def delete
         raise 'Key name must be specified.' if @name.blank?
-        @bucket.s3.interface.delete(@bucket, @name) 
+        @bucket.interface.delete(@bucket, @name) 
       end
       
       def grantees

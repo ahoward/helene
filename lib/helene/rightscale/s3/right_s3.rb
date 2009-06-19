@@ -698,7 +698,7 @@ module RightAws
         #   ...
         #  RightAws::S3::Grantee.owner_and_grantees(bucket) #=> [owner, grantees]
         #
-      def self.owner_and_grantees(thing)
+      def self.owner_and_grantees(bucket, key = '')
         if thing.is_a?(Bucket)
           bucket, key = thing, ''
         else

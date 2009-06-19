@@ -1,5 +1,5 @@
 module Helene
-  module Sdb
+  module S3
     class Grantee
       attr_reader :thing
       attr_reader :id
@@ -12,7 +12,7 @@ module Helene
         else
           bucket, key = thing.bucket, thing
         end
-        hash = bucket.s3.interface.get_acl_parse(bucket.to_s, key.to_s)
+        hash = bucket.interface.get_acl_parse(bucket.to_s, key.to_s)
         owner = Owner.new(hash[:owner][:id], hash[:owner][:display_name])
         
         grantees = []
@@ -41,7 +41,7 @@ module Helene
                grantees.map{|grantee| grantee.to_xml}.join +
                "</AccessControlList>" +
                "</AccessControlPolicy>"
-        bucket.s3.interface.put_acl(bucket.to_s, key.to_s, body)
+        bucket.interface.put_acl(bucket.to_s, key.to_s, body)
       end
 
       def initialize(thing, id, perms=[], action=:refresh, name=nil)
