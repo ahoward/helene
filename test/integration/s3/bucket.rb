@@ -70,7 +70,7 @@ testing Bucket = Helene::S3::Bucket do
   def create_bucket(options = {})
     @bucket ||= assert{ Bucket.create(bucket_name, options) }
     # at_exit{ @bucket.delete(:force => true) rescue nil if @bucket unless $! }
-    at_exit{ @bucket.delete(:force => true) rescue nil if @bucket }
+    at_exit{ Bucket.delete(@bucket, :force => true) rescue nil if @bucket }
   end
 
   def create_bucket_by_url
@@ -94,7 +94,7 @@ testing Bucket = Helene::S3::Bucket do
 
   def delete_bucket(options = {})
     create_bucket unless @bucket
-    assert{ @bucket.delete(options) }
+    assert{ Bucket.delete(@bucket, options) }
     @bucket = nil
   end
 

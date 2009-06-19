@@ -114,7 +114,7 @@ module Helene
       end
       
       def refresh(head=true)
-        new_key        = @bucket.key(self)
+        new_key        = @bucket.find_or_create_key_by_absolute_path(name)
         @last_modified = new_key.last_modified
         @e_tag         = new_key.e_tag
         @size          = new_key.size
@@ -145,8 +145,9 @@ module Helene
       end
  
       def exists?
-        @bucket.key(self).last_modified ? true : false
+        @bucket.find_or_create_key_by_absolute_path(name).last_modified ? true : false
       end
+
       
       def delete
         raise 'Key name must be specified.' if @name.blank?

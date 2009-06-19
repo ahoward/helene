@@ -61,13 +61,20 @@ module Helene
           end
         end
         alias_method 'url_for', 'url'
+
+        def delete(bucket, options ={})
+          options.to_options!
+          force = options.delete(:force)
+          name = bucket.is_a?(Bucket) ? bucket.name : bucket.to_s
+          force ? interface.force_delete_bucket(name) : interface.delete_bucket(name)
+        end
       end
 
       attr_accessor :name
       attr_accessor :interface
       attr_accessor :owner
       attr_accessor :creation_date
-      attr_accessor :prefix
+      attr :prefix
 
       def initialize(name, *args)
         options = args.extract_options!.to_options!
@@ -81,25 +88,36 @@ module Helene
         end
       end
 
+      def prefix= *prefixes
+        @prefix = cleanpath(*prefixes)
+      end
+
       def to_s
         @name.to_s
       end
 
       def == other
-        self.name == (other.respond_to?(:name) ? other.name : other.to_s)
+        name == other.name and prefix == other.prefix
       end
 
       def cleanpath(*paths)
         path = File.join(*paths.flatten.compact)
         path = path.to_s.strip
-        path.sub! %r|^/+|, ''
-        path.sub! %r|/+$|, ''
+        path.sub! %r|^[./]+|, ''
+        path.sub! %r|/*$|, '/'
         path.squeeze! '/'
         path
       end
 
-      def prefixed(path)
-        cleanpath(@prefix, path)
+      def prefixed(path, &block)
+        path = path.to_s
+        absolute = path =~ %r|^/|
+        if absolute
+          path[1..-1]
+        else
+          return scoping(path, &block) if block
+          @prefix ? File.join(@prefix, path) : path
+        end
       end
 
       def scoping(suffix, &block)
@@ -110,6 +128,12 @@ module Helene
         @prefix = old
       end
       alias_method 'suffixing', 'scoping'
+
+      def / suffix
+        bucket = clone
+        bucket.prefix = cleanpath(@prefix, suffix)
+        bucket
+      end
 
       def put(data, *args, &block)
         options = args.extract_options!.to_options!
@@ -183,19 +207,20 @@ module Helene
 
         case method.to_s
           when '', 'list'
+            (query ||= {})[:prefix] ||= prefix if prefix
             interface.list_bucket_link(name, query, expires, headers)
           when 'put'
-            interface.put_link(name, path, data, expires, headers)
+            interface.put_link(name, prefixed(path), data, expires, headers)
           when 'get'
-            interface.get_link(name, path, expires, headers)
+            interface.get_link(name, prefixed(path), expires, headers)
           when 'head'
-            interface.head_link(name, path, expires, headers)
+            interface.head_link(name, prefixed(path), expires, headers)
           when 'delete'
-            interface.delete_link(name, path, expires, headers)
+            interface.delete_link(name, prefixed(path), expires, headers)
           when 'get_acl'
-            interface.get_acl_link(name, path, headers)
+            interface.get_acl_link(name, prefixed(path), headers)
           when 'put_acl'
-            interface.put_acl_link(name, path, headers)
+            interface.put_acl_link(name, prefixed(path), headers)
           when 'get_bucket_acl'
             interface.get_bucket_acl_link(name, headers)
           when 'put_bucket_acl'
@@ -206,89 +231,107 @@ module Helene
       end
       alias_method 'url_for', 'url'
       
-      def delete(options ={})
+      def clear(options = {})
         options.to_options!
-        force = options.delete(:force)
-        force ? @interface.force_delete_bucket(@name) : @interface.delete_bucket(@name)
+        prefix = options[:prefix] || @prefix
+        if prefix
+          @interface.delete_folder(@name, prefix)
+        else
+          @interface.clear_bucket(name)
+        end
       end
 
-      def delete!
-        delete(:force => true)
+      def keys(options={}, &block)
+        options.to_options!
+        options[:prefix] ||= prefix
+        options.delete(:service)
+        keys_and_service(options, &block)
+      end
+      alias_method 'list', 'keys'
+
+      def ls(options = {}, &block)
+        names = []
+        keys do |key|
+          block ? block.call(key.name) : names.push(key.name)
+        end
+        block ? nil : names
       end
 
-### TODO - list all keys
-
-### TODO - prefixing
-
-      
-### TODO - shakey from here down yo!
-
-      def keys(options={}, head=false)
-        keys_and_service(options, head)[0]
-      end
-
-      def keys_and_service(options={}, head=false)
-        opt = {}; options.each{ |key, value| opt[key.to_s] = value }
-        service_data = {}
-        thislist = {}
-        list = []
-        @interface.incrementally_list_bucket(@name, opt) do |thislist|
-          thislist[:contents].each do |entry|
+    # TODO - refactor messiness with service
+    #
+      def keys_and_service(options={}, &block)
+        options.to_options!
+        options[:prefix] ||= prefix
+        head = options.delete(:head)
+        wants_service = options.delete(:service)
+        service = {}
+        hash = {}
+        keys = []
+        @interface.incrementally_list_bucket(@name, options.stringify_keys) do |hash|
+          hash[:contents].each do |entry|
             owner = Owner.new(entry[:owner_id], entry[:owner_display_name])
             key = Key.new(self, entry[:key], nil, {}, {}, entry[:last_modified], entry[:e_tag], entry[:size], entry[:storage_class], owner)
             key.head if head
-            list << key
+            block ? block.call(key) : keys.push(key)
           end
         end
-        thislist.each_key do |key|
-          service_data[key] = thislist[key] unless (key == :contents || key == :common_prefixes)
-        end
-        [list, service_data]
-      end
-
-      def key(key_name, head=false)
-        raise 'Key name can not be empty.' if key_name.blank?
-        key_instance = nil
-          # if this key exists - find it ....
-        keys({'prefix'=>key_name}, head).each do |key|
-          if key.name == key_name.to_s
-            key_instance = key
-            break
+        if wants_service
+          hash.each_key do |key|
+            service[key] = hash[key] unless (key == :contents || key == :common_prefixes)
           end
+          [keys, service]
+        else
+          block ? nil : keys
         end
-          # .... else this key is unknown
-        unless key_instance
-          key_instance = Key.create(self, key_name.to_s)
+      end
+
+      def key(path, options={}, &block)
+        options.to_options!
+        options[:prefix] ||= prefixed(path.to_s)
+        keys(options).first
+      end
+      alias_method '[]', 'key'
+
+    # TODO - refactor, possibly place in key.rb
+    #
+      def find_or_create_key_by_absolute_path(path, options = {})
+        path = path.to_s
+        options.to_options!
+        head = options.has_key?(:head) ? options.delete(:head) : true
+        key = nil
+        keys(:prefix => path, :head => head).each do |candidate|
+          break(key = candidate) if candidate.name == path
         end
-        key_instance
+        key ||= Key.create(self, path)
       end
 
-      def rename_key(old_key_or_name, new_name)
-        old_key_or_name = Key.create(self, old_key_or_name.to_s) unless old_key_or_name.is_a?(Key)
-        old_key_or_name.rename(new_name)
-        old_key_or_name
+      def has_key?(path)
+        find_or_create_key_by_absolute_path(prefixed(path)).exists?
       end
 
-      def copy_key(old_key_or_name, new_key_or_name)
-        old_key_or_name = Key.create(self, old_key_or_name.to_s) unless old_key_or_name.is_a?(Key)
-        old_key_or_name.copy(new_key_or_name)
+      def rename_key(src, dst)
+        src = Key.create(self, prefixed(src.to_s)) unless src.is_a?(Key)
+        src.rename(prefixed(dst))
+        src
       end
-      
-      def move_key(old_key_or_name, new_key_or_name)
-        old_key_or_name = Key.create(self, old_key_or_name.to_s) unless old_key_or_name.is_a?(Key)
-        old_key_or_name.move(new_key_or_name)
-      end
-      
-      def clear
-        @interface.clear_bucket(@name)  
-      end
+      alias_method 'rename', 'rename_key'
 
-      def delete_folder(folder, separator='/')
-        @interface.delete_folder(@name, folder, separator)
+      def copy_key(src, dst)
+        src = Key.create(self, prefixed(src.to_s)) unless src.is_a?(Key)
+        src.copy(prefixed(dst))
       end
+      alias_method 'cp', 'copy_key'
+      alias_method 'copy', 'copy_key'
       
-      def location
-        @location ||= @interface.bucket_location(@name)
+      def move_key(src, dst)
+        src = Key.create(self, prefixed(src.to_s)) unless src.is_a?(Key)
+        src.move(prefixed(dst))
+      end
+      alias_method 'mv', 'move_key'
+      alias_method 'move', 'move_key'
+
+      def location # '' or 'EU'
+        @location ||= @interface.bucket_location(name)
       end
       
       def logging_info
@@ -310,113 +353,6 @@ module Helene
       def grantees
         Grantee::grantees(self)
       end
-    end
-  end
-end
-
-__END__
-
-      def namespace(name, *args, &block)
-        namespace = Namespace.new(self, name, *args, &block)
-=begin
-        parts = name.to_s.gsub(%r/(^\/+|\/+$)/,'').gsub(%r/\/+/,'/').split(%r/\//)
-        part, *parts = parts
-        namespace = Namespace.new(self, part, *args, &block)
-        parts.each do |part|
-          namespace = Namespace.new(namespace, part, *args, &block)
-        end
-        namespace
-=end
-      end
-      alias_method 'namespaced', 'namespace'
-      alias_method '/', 'namespace'
-
-
-
-      class Namespace
-        module KeyMethods
-        end
-
-        attr :bucket
-        attr :name
-
-        def initialize bucket, name, options = {}
-          @bucket = bucket
-          @name = name.to_s
-          @name.sub! %r|^/+|, ''
-          @name.sub! %r|/+$|, ''
-          @name.sub! %r|/+|, '/'
-        end
-
-
-        alias_method 'prefix', 'name'
-
-        def namespace(name, *args, &block)
-          bucket.namespace(File.join(self.name, name.to_s), *args, &block)
-        end
-        alias_method 'namespaced', 'namespace'
-        alias_method '/', 'namespace'
-
-        def keys options = {}
-          options.to_options!
-          options[:prefix] ||= prefix unless prefix.blank?
-          headers = options.delete(:headers)
-          bucket.keys(options, headers)
-        end
-
-        def put(data, *args, &block)
-          options = args.extract_options!.to_options!
-
-          meta = options.delete(:meta) || {}
-          perms = options.delete(:perms)
-          headers = options.delete(:headers) || {}
-
-          io_for(data) do |io|
-            key = key_for(args.shift || io)
-            bucket.put(key, io, meta, perms, headers)
-          end
-        end
-
-        def get(key, *args, &block)
-          options = args.extract_options!.to_options!
-          headers = options.delete(:headers) || {}
-          key = key_for(key)
-          bucket.get(key, headers)
-        end
-
-        def io_for(arg)
-          return(arg.respond_to?(:read) ? yield(arg) : open(arg.to_s){|io| yield(io)})
-        end
-
-        def key_for(arg, options = {})
-          path = nil
-          %w[ path pathname filename ].each do |msg|
-            break(path = arg.send(msg).to_s) if arg.respond_to?(msg)
-          end
-          path ||= arg.to_s
-          path.strip!
-          raise Errror, "no path in #{ io.inspect }" if path.blank?
-          key = File.join('/', prefix, path).squeeze('/')[1..-1].sub(%r|/+$|, '')
-        end
-
-        def list_keys_link options = {}
-          options.to_options!
-          expires = options.delete(:expires) || 1.hour
-          headers = options.delete(:headers) || {}
-          options[:prefix] = name
-          bucket.s3g.keys(options, expires, headers)
-        end
-
-        def ls(options = {})
-          options.to_options!
-          expires = options.delete(:expires) || 1.hour
-          headers = options.delete(:headers) || {}
-          keys.map do |key|
-            bucket.s3g.key(key).get(expires, headers)
-          end
-        end
-      end
-
     end
   end
 end
