@@ -111,15 +111,6 @@ module Helene
       end
       alias_method 'suffixing', 'scoping'
 
-=begin
-      def keys options = {}
-        options.to_options!
-        options[:prefix] ||= prefix unless prefix.blank?
-        headers = options.delete(:headers)
-        bucket.keys(options, headers)
-      end
-=end
-
       def put(data, *args, &block)
         options = args.extract_options!.to_options!
 
@@ -180,8 +171,6 @@ module Helene
         Util.content_type_for(basename)
       end
 
-### TODO - shakey from here down yo!
-
       def url(*args)
         options = args.extract_options!.to_options!
         options.to_options!
@@ -216,32 +205,23 @@ module Helene
         end
       end
       alias_method 'url_for', 'url'
+      
+      def delete(options ={})
+        options.to_options!
+        force = options.delete(:force)
+        force ? @interface.force_delete_bucket(@name) : @interface.delete_bucket(@name)
+      end
+
+      def delete!
+        delete(:force => true)
+      end
+
+### TODO - list all keys
+
+### TODO - prefixing
 
       
-      def public_link
-        params = @interface.params
-        "#{params[:protocol]}://#{params[:server]}:#{params[:port]}/#{full_name}"
-      end
-      
-      def location
-        @location ||= @interface.bucket_location(@name)
-      end
-      
-      def logging_info
-        @interface.get_logging_parse(:bucket => @name)
-      end
-      
-      def enable_logging(params)
-        AwsUtils.mandatory_arguments([:targetbucket, :targetprefix], params)
-        AwsUtils.allow_only([:targetbucket, :targetprefix], params)
-        xmldoc = "<?xml version=\"1.0\" encoding=\"UTF-8\"?><BucketLoggingStatus xmlns=\"http://doc.s3.amazonaws.com/2006-03-01\"><LoggingEnabled><TargetBucket>#{params[:targetbucket]}</TargetBucket><TargetPrefix>#{params[:targetprefix]}</TargetPrefix></LoggingEnabled></BucketLoggingStatus>"
-        @interface.put_logging(:bucket => @name, :xmldoc => xmldoc)
-      end
-      
-      def disable_logging
-        xmldoc = "<?xml version=\"1.0\" encoding=\"UTF-8\"?><BucketLoggingStatus xmlns=\"http://doc.s3.amazonaws.com/2006-03-01\"></BucketLoggingStatus>"
-        @interface.put_logging(:bucket => @name, :xmldoc => xmldoc)
-      end
+### TODO - shakey from here down yo!
 
       def keys(options={}, head=false)
         keys_and_service(options, head)[0]
@@ -283,18 +263,6 @@ module Helene
         key_instance
       end
 
-=begin
-      def put(key, data=nil, meta_headers={}, perms=nil, headers={})
-        key = Key.create(self, key.to_s, data, meta_headers) unless key.is_a?(Key) 
-        key.put(data, perms, headers)
-      end
-=end
-
-      def get(key, headers={})
-        key = Key.create(self, key.to_s) unless key.is_a?(Key)
-        key.get(headers)
-      end
-
       def rename_key(old_key_or_name, new_name)
         old_key_or_name = Key.create(self, old_key_or_name.to_s) unless old_key_or_name.is_a?(Key)
         old_key_or_name.rename(new_name)
@@ -319,14 +287,24 @@ module Helene
         @interface.delete_folder(@name, folder, separator)
       end
       
-      def delete(options ={})
-        options.to_options!
-        force = options.delete(:force)
-        force ? @interface.force_delete_bucket(@name) : @interface.delete_bucket(@name)
+      def location
+        @location ||= @interface.bucket_location(@name)
       end
-
-      def delete!
-        delete(:force => true)
+      
+      def logging_info
+        @interface.get_logging_parse(:bucket => @name)
+      end
+      
+      def enable_logging(params)
+        AwsUtils.mandatory_arguments([:targetbucket, :targetprefix], params)
+        AwsUtils.allow_only([:targetbucket, :targetprefix], params)
+        xmldoc = "<?xml version=\"1.0\" encoding=\"UTF-8\"?><BucketLoggingStatus xmlns=\"http://doc.s3.amazonaws.com/2006-03-01\"><LoggingEnabled><TargetBucket>#{params[:targetbucket]}</TargetBucket><TargetPrefix>#{params[:targetprefix]}</TargetPrefix></LoggingEnabled></BucketLoggingStatus>"
+        @interface.put_logging(:bucket => @name, :xmldoc => xmldoc)
+      end
+      
+      def disable_logging
+        xmldoc = "<?xml version=\"1.0\" encoding=\"UTF-8\"?><BucketLoggingStatus xmlns=\"http://doc.s3.amazonaws.com/2006-03-01\"></BucketLoggingStatus>"
+        @interface.put_logging(:bucket => @name, :xmldoc => xmldoc)
       end
 
       def grantees
@@ -337,99 +315,6 @@ module Helene
 end
 
 __END__
-module Helene
-  module S3
-    class Bucket < RightAws::S3::Bucket
-      Bucket.const_set(:Owner, RightAws::S3::Owner)
-      # Bucket.const_set(:Key, RightAws::S3::Key)
-      Bucket.const_set(:Grantee, RightAws::S3::Grantee)
-      Bucket.const_set(:S3Generator, RightAws::S3Generator)
-
-      class Key < RightAws::S3::Key
-      end
-
-      class Error < Helene::Error; end
-
-    # class methods
-    #
-      class << Bucket
-        def list
-          S3.interface.list_all_my_buckets.map! do |entry|
-            owner = Owner.new(entry[:owner_id], entry[:owner_display_name])
-            new(S3, entry[:name], entry[:creation_date], owner)
-          end
-        end
-        alias_method 'buckets', 'list'
-
-        def create(name, perms=nil, headers={})
-          bucket(name, create=true, perms, headers)
-        end
-
-        def bucket(name, create=false, perms=nil, headers={})
-          name = namespaced(name)
-          headers['x-amz-acl'] = perms if perms
-          S3.interface.create_bucket(name, headers) if create
-          list.each{|bucket| return bucket if bucket.name == name}
-          nil
-        end
-
-        def for(name, options = {})
-          result = S3.interface.list_bucket(name.to_s)
-          service = result.service
-          owner = Owner.new(service[:owner_id], service[:owner_display_name]) # HACK - will always be nil
-          bucket = new(S3, service[:name], service[:creation_date], owner)
-          owner, grantees = RightAws::S3::Grantee.owner_and_grantees(bucket)
-          bucket.owner = owner
-          bucket
-        end
-
-        def new(*args, &block)
-          if args.size == 4
-            return super
-          else
-            Bucket.for(*args, &block)
-          end
-        end
-      end
-
-    # instance methods
-    #
-      attr_accessor 'owner'
-
-      def put(key, data=nil, meta_headers={}, perms=nil, headers={})
-        key = Key.create(self, key.to_s, data, meta_headers) unless key.is_a?(Key) 
-        key.put(data, perms, headers)
-        key
-      end
-
-      def get(key, headers={})
-        key = Key.create(self, key.to_s) unless key.is_a?(Key)
-        key.get(headers)
-        key
-      end
-
-      def s3g
-        @s3g ||= S3.s3g.bucket(name)
-      end
-
-      def create_link
-        s3g.create_link
-      end
-
-      def public_link
-        s3g.public_link
-      end
-
-      def list_keys_link options = {}
-        options.to_options!
-        expires = options.delete(:expires) || 1.hour
-        headers = options.delete(:headers) || {}
-        s3g.keys(options, expires, headers)
-      end
-
-      def root(*args, &block)
-        namespace('', *args, &block)
-      end
 
       def namespace(name, *args, &block)
         namespace = Namespace.new(self, name, *args, &block)

@@ -4,6 +4,7 @@ module Helene
       class Error < Helene::Error; end
       class RecordNotFound < Error; end
       class RecordInvalid < Error; end
+      class RecordNotSaved < Error; end
 
       class << Base
         def error!(message)

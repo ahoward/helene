@@ -413,7 +413,9 @@ module Helene
             accum.count
           else
             if result_arity == 1
-              accum.items.first
+              record = accum.items.first
+              raise RecordNotFound unless record
+              record
             else
               limit ? accum.items[0,limit] : accum.items
             end
@@ -908,17 +910,20 @@ module Helene
 
       def save(options = {})
         options.to_options!
+        should_raise = options[:raise]
         before_save
         if(before_validation()==false)
-          raise(RecordInvalid) if options[:raise]
+          raise(RecordInvalid) if should_raise
           return false
         end
         unless valid?
-          raise(RecordInvalid) if options[:raise]
+          raise(RecordInvalid) if should_raise
           return false
         end
         after_validation()
-        save_without_validation
+        saved = save_without_validation
+        raise(RecordNotSaved) if should_raise unless saved
+        saved
       ensure
         after_save unless raising_an_error?
       end

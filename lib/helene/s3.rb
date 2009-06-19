@@ -29,7 +29,6 @@ module Helene
       load 'helene/s3/key.rb'
       load 'helene/s3/owner.rb'
       load 'helene/s3/grantee.rb'
-      load 'helene/s3/url.rb'
     end
   end
 end
