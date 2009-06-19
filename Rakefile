@@ -3,16 +3,17 @@ task :default do
 end
 
 namespace 'test' do
-  def test_files(glob, &block)
+  def test_files(prefix=nil, &block)
     files = [ENV['FILES'], ENV['FILE']].flatten.compact
     if files.empty?
-      files = Dir.glob(glob)
+      files = Dir.glob("#{ prefix }/**/*.rb")
     else
       files.map!{|file| Dir.glob(file)}.flatten.compact
     end
     files = files.join(' ').strip.split(%r/\s+/)
     files.delete_if{|file| file =~ /(begin|ensure|setup|teardown).rb$/}
     files.delete_if{|file| !test(?s, file) or !test(?f, file)}
+    files.delete_if{|file| !file[%r/#{ prefix }/]}
     block ? files.each{|file| block.call(file)} : files
   end
 
@@ -22,15 +23,15 @@ namespace 'test' do
 
   desc 'run unit tests'
   task 'unit' do
-    test_files("test/unit/**/*.rb") do |file|
+    test_files('test/unit/') do |file|
       test_loader file
     end
   end
 
   desc 'run integration tests'
   task 'integration' do
-    test_files("test/integration/**/*.rb") do |file|
-      test_loader file, :require_auth => true, :require_auth => true
+    test_files('test/integration/') do |file|
+      test_loader file, :require_auth => true
     end
   end
 
@@ -114,8 +115,10 @@ BEGIN {
   def Template(*args, &block) Template.new(*args, &block) end
 
   def test_loader basename, options = {}
+    tests = ENV['TESTS']||ENV['TEST']
+    tests = " -- -n #{ tests.inspect }" if tests
     auth = '-r test/auth.rb ' if options[:require_auth]
-    command = "ruby -r test/loader.rb #{ auth }#{ basename }"
+    command = "ruby -r test/loader.rb #{ auth }#{ basename }#{ tests }"
     STDERR.print "\n==== TEST ====\n  #{ command }\n\n==============\n"
     system command or abort("#{ command } # FAILED WITH #{ $?.inspect }")
   end

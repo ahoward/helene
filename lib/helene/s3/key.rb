@@ -1,6 +1,18 @@
 module Helene
   module S3
     class Key
+      def url(*args)
+        options = args.extract_options!.to_options!
+        options.to_options!
+        expires = options.delete(:expires) || 24.hours
+        headers = options.delete(:headers) || {}
+        case args.shift.to_s
+          when '', 'get'
+            bucket.interface.get_link(bucket, name.to_s, expires, headers)
+        end
+      end
+
+      alias_method 'url_for', 'url'
       attr_reader   :bucket,  :name, :last_modified, :e_tag, :size, :storage_class, :owner
       attr_accessor :headers, :meta_headers
       attr_writer   :data
@@ -17,7 +29,7 @@ module Helene
         [hash, meta]
       end
       
-      def self.add_meta_prefix(meta_headers, prefix=S3Interface::AMAZON_METADATA_PREFIX)
+      def self.add_meta_prefix(meta_headers, prefix='x-amz-meta-')
         meta = {}
         meta_headers.each do |meta_header, value|
           if meta_header[/#{prefix}/]

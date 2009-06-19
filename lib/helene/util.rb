@@ -123,6 +123,10 @@ module Helene
       "#{ m }(#{ c })#{ b }"
     end
 
+    def content_type_for(basename)
+      ContentType.for(basename)
+    end
+
     extend self
   end
 end

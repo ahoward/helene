@@ -21,7 +21,9 @@ module Helene
         end
         alias_method 'buckets', 'list'
 
-        def create(name, headers = {})
+        def create(name, options = {})
+          options.to_options!
+          headers = options.delete(:headers) || {}
           interface.create_bucket(name, headers)
           new(name)
         end
@@ -41,6 +43,24 @@ module Helene
           bucket
         end
         alias_method 'for', 'new'
+
+        def url(*args)
+          options = args.extract_options!.to_options!
+          options.to_options!
+          expires = options[:expires] || 24.hours
+          headers = options.delete(:headers) || {}
+          case args.shift.to_s
+            when '', 'list'
+              interface.list_all_my_buckets_link(expires, headers)
+            when 'create'
+              bucket = args.shift.to_s
+              interface.create_bucket_link(bucket, expires, headers)
+            when 'delete'
+              bucket = args.shift.to_s
+              interface.delete_bucket_link(bucket, expires, headers)
+          end
+        end
+        alias_method 'url_for', 'url'
       end
 
       attr_accessor :name
@@ -54,23 +74,127 @@ module Helene
         @name  = name.to_s
         @interface = options[:interface] || S3.interface
         @owner = options[:owner]
-        @prefix = options[:prefix]
         @creation_date = options[:creation_date]
+        @prefix = cleanpath(options[:prefix]) if options[:prefix]
         if @creation_date && !@creation_date.is_a?(Time)
           @creation_date = Time.parse(@creation_date)
         end
       end
 
-
-# TODO 
-# TODO 
-# TODO 
-# TODO 
-      
       def to_s
         @name.to_s
       end
-      alias_method :full_name, :to_s
+
+      def == other
+        self.name == (other.respond_to?(:name) ? other.name : other.to_s)
+      end
+
+      def cleanpath(*paths)
+        path = File.join(*paths.flatten.compact)
+        path = path.to_s.strip
+        path.sub! %r|^/+|, ''
+        path.sub! %r|/+$|, ''
+        path.squeeze! '/'
+        path
+      end
+
+      def prefixed(path)
+        cleanpath(@prefix, path)
+      end
+
+      def scoping(suffix, &block)
+        old = @prefix
+        @prefix = cleanpath(@prefix, suffix)
+        block.call
+      ensure
+        @prefix = old
+      end
+      alias_method 'suffixing', 'scoping'
+
+=begin
+      def keys options = {}
+        options.to_options!
+        options[:prefix] ||= prefix unless prefix.blank?
+        headers = options.delete(:headers)
+        bucket.keys(options, headers)
+      end
+=end
+
+      def put(data, *args, &block)
+        options = args.extract_options!.to_options!
+
+        meta = options.delete(:meta) || {}
+        perms = options.delete(:perms)
+        headers = options.delete(:headers) || {}
+
+        io_for(data) do |io|
+          path = args.shift || path_for(io)
+          key = key_for(path, io, meta)
+          headers = headers_for(path, headers)
+          key.put(io, perms, headers)
+          key
+        end
+      end
+
+      def get(path, *args, &block)
+        options = args.extract_options!.to_options!
+        headers = options.delete(:headers) || {}
+        key = key_for(path)
+        key.get(headers)
+      end
+
+      def io_for(arg)
+        return(arg.respond_to?(:read) ? yield(arg) : open(arg.to_s){|io| yield(io)})
+      end
+
+      def path_for(arg)
+        path = nil
+        %w[ path pathname filename ].each do |msg|
+          if arg.respond_to?(msg)
+            path = File.basename(arg.send(msg).to_s)
+            break path
+          end
+        end
+        raise Errror, "no path from #{ arg.inspect }" if path.blank?
+        cleanpath(path)
+      end
+
+      def key_for(arg, io = nil, meta = {})
+        return arg if arg.is_a?(Key)
+        Key.create(self, prefixed(arg.to_s), io, meta)
+      end
+
+      def headers_for(path, headers = {})
+        headers = HashWithIndifferentAccess.new(headers)
+        content_type = (
+          headers.delete(:content_type) ||
+          headers.delete(:Content_Type) ||
+          headers.delete(:ContentType) ||
+          content_type_for(path)
+        )
+        headers.merge!('Content-Type' => content_type) if content_type
+        headers
+      end
+
+      def content_type_for(basename)
+        Util.content_type_for(basename)
+      end
+
+      def url(*args)
+        options = args.extract_options!.to_options!
+        options.to_options!
+        expires = options[:expires] || 24.hours
+        headers = options
+        case args.shift.to_s
+          when '', 'list'
+          when 'create'
+          when 'delete'
+        end
+      end
+      alias_method 'url_for', 'url'
+
+      
+### TODO
       
       def public_link
         params = @interface.params
@@ -136,11 +260,13 @@ module Helene
         end
         key_instance
       end
-      
+
+=begin
       def put(key, data=nil, meta_headers={}, perms=nil, headers={})
         key = Key.create(self, key.to_s, data, meta_headers) unless key.is_a?(Key) 
         key.put(data, perms, headers)
       end
+=end
 
       def get(key, headers={})
         key = Key.create(self, key.to_s) unless key.is_a?(Key)
@@ -171,8 +297,14 @@ module Helene
         @interface.delete_folder(@name, folder, separator)
       end
       
-      def delete(force=false)
+      def delete(options ={})
+        options.to_options!
+        force = options.delete(:force)
         force ? @interface.force_delete_bucket(@name) : @interface.delete_bucket(@name)
+      end
+
+      def delete!
+        delete(:force => true)
       end
 
       def grantees
@@ -308,6 +440,7 @@ module Helene
           @name.sub! %r|/+$|, ''
           @name.sub! %r|/+|, '/'
         end
+
 
         alias_method 'prefix', 'name'
 

@@ -76,6 +76,10 @@ module Helene
     end
   end
 
+  def Helene.uuid
+    UUID.timestamp_create().to_s
+  end
+
 # helene
 #
   Helene.load_path do
@@ -88,6 +92,7 @@ module Helene
     load 'sleepcycle.rb'
     load 'superhash.rb'
     load 'attempt.rb'
+    load 'content_type.rb'
     load 'logging.rb'
     load 'config.rb'
     load 'aws.rb'

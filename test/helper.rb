@@ -20,6 +20,10 @@ module Helene
     end
 
     Helper = lambda do
+      def self.setup(&block)
+        define_method(:setup, &block)
+      end
+
       alias_method '__assert__', 'assert'
 
       def assert(*args, &block)
@@ -70,6 +74,13 @@ module Helene
         assert(false, label)
       end
 
+      def subclass_of exception
+        class << exception
+          def ==(other) super or self > other end
+        end
+        exception
+      end
+
       include Models
     end
   end
@@ -80,8 +91,7 @@ private
   def testing(*args, &block)
     Class.new(::Test::Unit::TestCase) do
       module_eval &Helene::Test::Helper
-      args.push 'default' if args.empty?
-      context(*args, &block)
+      module_eval(&block)
     end
   end
 end
