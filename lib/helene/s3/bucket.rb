@@ -334,22 +334,43 @@ module Helene
         @location ||= @interface.bucket_location(name)
       end
       
+    # TODO - totally untested
+    #
       def logging_info
         @interface.get_logging_parse(:bucket => @name)
       end
       
+    # TODO - totally untested
+    #
       def enable_logging(params)
         AwsUtils.mandatory_arguments([:targetbucket, :targetprefix], params)
         AwsUtils.allow_only([:targetbucket, :targetprefix], params)
-        xmldoc = "<?xml version=\"1.0\" encoding=\"UTF-8\"?><BucketLoggingStatus xmlns=\"http://doc.s3.amazonaws.com/2006-03-01\"><LoggingEnabled><TargetBucket>#{params[:targetbucket]}</TargetBucket><TargetPrefix>#{params[:targetprefix]}</TargetPrefix></LoggingEnabled></BucketLoggingStatus>"
+        xmldoc = 
+          "
+            <?xml version=\"1.0\" encoding=\"UTF-8\"?>
+              <BucketLoggingStatus xmlns=\"http://doc.s3.amazonaws.com/2006-03-01\">
+              <LoggingEnabled>
+                <TargetBucket>#{params[:targetbucket]}</TargetBucket>
+                <TargetPrefix>#{params[:targetprefix]}</TargetPrefix>
+              </LoggingEnabled></BucketLoggingStatus>
+          "
         @interface.put_logging(:bucket => @name, :xmldoc => xmldoc)
       end
       
+    # TODO - totally untested
+    #
       def disable_logging
-        xmldoc = "<?xml version=\"1.0\" encoding=\"UTF-8\"?><BucketLoggingStatus xmlns=\"http://doc.s3.amazonaws.com/2006-03-01\"></BucketLoggingStatus>"
+        xmldoc =
+          "
+            <?xml version=\"1.0\" encoding=\"UTF-8\"?>
+              <BucketLoggingStatus xmlns=\"http://doc.s3.amazonaws.com/2006-03-01\">
+              </BucketLoggingStatus>
+          "
         @interface.put_logging(:bucket => @name, :xmldoc => xmldoc)
       end
 
+    # TODO - totally untested
+    #
       def grantees
         Grantee::grantees(self)
       end
