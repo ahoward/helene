@@ -180,21 +180,43 @@ module Helene
         Util.content_type_for(basename)
       end
 
+### TODO - shakey from here down yo!
+
       def url(*args)
         options = args.extract_options!.to_options!
         options.to_options!
-        expires = options[:expires] || 24.hours
-        headers = options
-        case args.shift.to_s
+        method = options.delete(:method) || args.shift.to_s
+        path = options.delete(:path) || args.shift
+        data = options.delete(:data) || args.shift
+        expires = options.delete(:expires) || 24.hours
+        query = options.delete(:query)
+        headers = options.delete(:headers) || {}
+
+        case method.to_s
           when '', 'list'
-          when 'create'
+            interface.list_bucket_link(name, query, expires, headers)
+          when 'put'
+            interface.put_link(name, path, data, expires, headers)
+          when 'get'
+            interface.get_link(name, path, expires, headers)
+          when 'head'
+            interface.head_link(name, path, expires, headers)
           when 'delete'
+            interface.delete_link(name, path, expires, headers)
+          when 'get_acl'
+            interface.get_acl_link(name, path, headers)
+          when 'put_acl'
+            interface.put_acl_link(name, path, headers)
+          when 'get_bucket_acl'
+            interface.get_bucket_acl_link(name, headers)
+          when 'put_bucket_acl'
+            interface.put_bucket_acl_link(name, headers)
+          else
+            raise ArgumentError, method.inspect
         end
       end
       alias_method 'url_for', 'url'
 
-      
-### TODO
       
       def public_link
         params = @interface.params
