@@ -3,49 +3,49 @@ task :default do
 end
 
 namespace 'test' do
-  desc 'run all tests'
-    task 'all' => %w[ unit integration ] do
+  def test_files(glob, &block)
+    files = [ENV['FILES'], ENV['FILE']].flatten.compact
+    if files.empty?
+      files = Dir.glob(glob)
+    else
+      files.map!{|file| Dir.glob(file)}.flatten.compact
     end
+    files = files.join(' ').strip.split(%r/\s+/)
+    files.delete_if{|file| file =~ /(begin|ensure|setup|teardown).rb$/}
+    files.delete_if{|file| !test(?s, file) or !test(?f, file)}
+    block ? files.each{|file| block.call(file)} : files
+  end
+
+  desc 'run all tests'
+  task 'all' => %w[ unit integration ] do
+  end
 
   desc 'run unit tests'
-    task 'unit' do
-      %w[
-      ].each do |basename|
-        test_loader "test/unit/#{ basename }.rb"
-      end
+  task 'unit' do
+    test_files("test/unit/**/*.rb") do |file|
+      test_loader file
     end
+  end
 
   desc 'run integration tests'
-    task 'integration' do
-      file = ENV["FILE"]
-      # test_loader 'test/integration/setup.rb'
-      # open($test_integration_setup_guard, 'w'){|fd| fd.puts Time.now.utc.iso8601(2) }
-
-      Dir.glob("test/integration/sdb/*.rb") do |test_file|
-        next unless file.nil? or test_file =~ /#{Regexp.escape(file)}(?:\.rb)?\z/
-
-        begin
-          test_loader test_file, :require_auth => true
-        ensure
-          #test_loader('test/integration/ensure.rb', :require_auth => true)
-        end
-      end
-
-      # test_loader 'test/integration/teardown.rb'
+  task 'integration' do
+    test_files("test/integration/**/*.rb") do |file|
+      test_loader file, :require_auth => true, :require_auth => true
     end
+  end
 
-    namespace 'integration' do
-      task 'setup' do
-        test_loader 'test/integration/setup.rb', :require_auth => true
-      end
-      task 'teardown' do
-        test_loader 'test/integration/teardown.rb', :require_auth => true
-      end
+  namespace 'integration' do
+    task 'setup' do
+      test_loader 'test/integration/setup.rb', :require_auth => true
     end
+    task 'teardown' do
+      test_loader 'test/integration/teardown.rb', :require_auth => true
+    end
+  end
 end
 
-task 'test' => 'test:all' do
-end
+task('test' => 'test:all'){}
+
 
 
 BEGIN {

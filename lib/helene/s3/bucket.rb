@@ -2,10 +2,48 @@ module Helene
   module S3
     class Bucket
       attr_reader :s3, :name, :owner, :creation_date
-      
-      def self.create(s3, name, create=false, perms=nil, headers={}) 
-        s3.bucket(name, create, perms, headers)
+
+
+      class << Bucket
+        def list
+          S3.interface.list_all_my_buckets.map! do |entry|
+            owner = Owner.new(entry[:owner_id], entry[:owner_display_name])
+            new(S3, entry[:name], entry[:creation_date], owner)
+          end
+        end
+        alias_method 'buckets', 'list'
+
+        def create(name, perms=nil, headers={})
+          bucket(name, create=true, perms, headers)
+        end
+
+        def bucket(name, create=false, perms=nil, headers={})
+          name = namespaced(name)
+          headers['x-amz-acl'] = perms if perms
+          S3.interface.create_bucket(name, headers) if create
+          list.each{|bucket| return bucket if bucket.name == name}
+          nil
+        end
+
+        def for(name, options = {})
+          result = S3.interface.list_bucket(name.to_s)
+          service = result.service
+          owner = Owner.new(service[:owner_id], service[:owner_display_name]) # HACK - will always be nil
+          bucket = new(S3, service[:name], service[:creation_date], owner)
+          owner, grantees = RightAws::S3::Grantee.owner_and_grantees(bucket)
+          bucket.owner = owner
+          bucket
+        end
+
+        def new(*args, &block)
+          if args.size == 4
+            return super
+          else
+            Bucket.for(*args, &block)
+          end
+        end
       end
+      
 
       def initialize(s3, name, creation_date=nil, owner=nil)
         @s3    = s3

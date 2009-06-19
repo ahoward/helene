@@ -162,7 +162,9 @@ them.
       @params[:http_connection_retry_delay]  ||= @@params[:http_connection_retry_delay]
       @http   = nil
       @server = nil
-      @logger = get_param(:logger) || NullLogger
+      @logger = get_param(:logger)
+      @logger ||= RAILS_DEFAULT_LOGGER if defined?(RAILS_DEFAULT_LOGGER)
+      @logger ||= NullLogger
       @ca_file = get_param(:ca_file)
       @state = {}
       @eof = {}

@@ -229,7 +229,9 @@ module RightAws
         @params[:protocol] ||= service_info[:default_protocol]
       end
       @params[:multi_thread] ||= defined?(AWS_DAEMON)
-      @logger = @params[:logger] || NullLogger
+      @logger = @params[:logger]
+      @logger ||= RAILS_DEFAULT_LOGGER if defined?(RAILS_DEFAULT_LOGGER)
+      @logger ||= NullLogger
       @logger.info "New #{self.class.name} using #{@params[:multi_thread] ? 'multi' : 'single'}-threaded mode"
       @error_handler = nil
       @cache = {}
