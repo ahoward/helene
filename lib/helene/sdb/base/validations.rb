@@ -58,6 +58,14 @@ module Helene
             block = lambda{|h,k| h[k] = []}
             super(&block)
           end
+
+          def Errors._load(string)
+            new.update(Marshal.load(string))
+          end
+
+          def _dump(*a)
+            Marshal.dump({}.update(to_hash))
+          end
           
           def count
             size
