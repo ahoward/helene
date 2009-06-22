@@ -953,6 +953,8 @@ module Helene
         end
       end
 
+      alias_method 'update_attributes', 'update!'
+
       def put_attributes(attributes)
         updating do
           sdb_attributes = ruby_to_sdb(attributes)
