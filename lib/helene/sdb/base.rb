@@ -151,6 +151,14 @@ module Helene
           generate_uuid
         end
 
+        def singular
+          name.singularize.downcase
+        end
+
+        def plural
+          name.pluralize.downcase
+        end
+
       # create
       #
         def create(attributes={})
@@ -1171,6 +1179,10 @@ module Helene
 
       def to_param
         id ? id : 'new'
+      end
+
+      def model_name
+        klass.name
       end
 
       def domain
