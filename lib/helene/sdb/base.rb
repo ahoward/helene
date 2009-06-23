@@ -316,6 +316,16 @@ module Helene
         end
         alias_method 'find', 'select'
 
+        def method_missing(message, *args, &block)
+          message = message.to_s
+          re = %r/^(?:find|select)(_all)?_by_(.*)$/io
+          match, all, clause = message.match(re).to_a
+          super unless match
+          clauses = clause.split(%r/_and_/io)
+          conditions = clauses.inject(Hash.new){|hash,attr| hash.update attr => args.shift} 
+          select(all ? :all : :first, :conditions => conditions)
+        end
+
         def execute_select(*args, &block)
           log(:debug){ "execute_select <- #{ args.inspect }" }
           options = args.extract_options!.to_options!
