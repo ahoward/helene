@@ -17,6 +17,7 @@ module Helene
         attr :class_name
         attr :foreign_key
         attr :dependent
+        attr :conditions
 
         def initialize(base, name, options = {}, &block)
           @base = base
@@ -27,10 +28,16 @@ module Helene
           @class_name ||= (options[:class_name] || @name.camelize.singularize).to_s
           @dependent ||= (options[:dependent] || :nullify).to_s.to_sym
 
+          @conditions = (options[:conditions] || {}).to_options!
+
           association = self
           @base.module_eval do
             define_method("#{ name }_association"){ association }
           end
+        end
+
+        def conditions_for(conditions)
+          self.conditions.dup.update(conditions.to_options)
         end
 
         def associated_class
@@ -117,7 +124,7 @@ module Helene
               parent.id
             end
 
-            %w[ foreign_type foreign_key associated_class dependent ].each do |attr|
+            %w[ foreign_type foreign_key associated_class dependent conditions_for ].each do |attr|
               module_eval <<-__
                 def #{ attr }(*a, &b) association.send('#{ attr }', *a, &b) end
                 def #{ attr }=(*a, &b) association.send('#{ attr }=', *a, &b) end
@@ -163,7 +170,7 @@ module Helene
 
               conditions[foreign_key] = parent_id
 
-              records = associated_class.select(:all, :conditions => conditions)
+              records = associated_class.select(:all, :conditions => conditions_for(conditions))
               replace records
               self
             end
@@ -279,7 +286,7 @@ module Helene
               conditions[foreign_type] = class_name
             end
             conditions[:id] = record[foreign_key]
-            associated = associated_class.find(:first, :conditions => conditions)
+            associated = associated_class.find(:first, :conditions => conditions_for(conditions))
           end
 
           def set(record, value)
