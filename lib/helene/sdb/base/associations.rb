@@ -16,6 +16,7 @@ module Helene
         attr :options
         attr :class_name
         attr :foreign_key
+        attr :foreign_keys
         attr :dependent
         attr :conditions
 
@@ -29,6 +30,7 @@ module Helene
           @dependent ||= (options[:dependent] || :nullify).to_s.to_sym
 
           @conditions = (options[:conditions] || {}).to_options!
+          @foreign_keys = options[:foreign_keys]
 
           association = self
           @base.module_eval do
@@ -57,14 +59,26 @@ module Helene
           def initialize(base, name, options = {}, &block)
             super
 
-            @polymorphic ||= options[:polymorphic]
+            if @foreign_keys
+              if @foreign_keys == true
+                @foreign_keys = associated_class.name.foreign_key.pluralize.to_sym
+              else
+                @foreign_keys = @foreign_keys.to_s.to_sym
+              end
+            else
+              @polymorphic ||= options[:polymorphic]
 
-            if @polymorphic
-              @foreign_type ||= "#{ @polymorphic }_type"
-              @foreign_key ||= "#{ @polymorphic }_id"
+              if @polymorphic
+                @foreign_type ||= "#{ @polymorphic }_type"
+                @foreign_key ||= "#{ @polymorphic }_id"
+              end
+
+              if options.has_key?(:foreign_key)
+                @foreign_key = options[:foreign_key]
+              else
+                @foreign_key ||= @base.name.foreign_key.to_s
+              end
             end
-
-            @foreign_key ||= (options[:foreign_key] || @base.name.foreign_key).to_s
 
             lineno, code = __LINE__ + 1, <<-__
               def #{ name }(*args, &block)
@@ -112,6 +126,28 @@ module Helene
               reload
             end
 
+            def reload
+              if foreign_keys
+                ids = Array(parent.send(foreign_keys))
+                records = ids.empty? ? [] : associated_class.select(ids)
+              else
+                conditions = {}
+
+                foreign_type = association.foreign_type
+                foreign_key = association.foreign_key
+
+                if foreign_type
+                  conditions[foreign_type] = parent_type
+                end
+
+                conditions[foreign_key] = parent_id
+
+                records = associated_class.select(:all, :conditions => conditions_for(conditions))
+              end
+              replace records
+              self
+            end
+
             def parent_class
               associated_class
             end
@@ -124,7 +160,7 @@ module Helene
               parent.id
             end
 
-            %w[ foreign_type foreign_key associated_class dependent conditions_for ].each do |attr|
+            %w[ foreign_keys foreign_type foreign_key associated_class dependent conditions_for ].each do |attr|
               module_eval <<-__
                 def #{ attr }(*a, &b) association.send('#{ attr }', *a, &b) end
                 def #{ attr }=(*a, &b) association.send('#{ attr }=', *a, &b) end
@@ -132,20 +168,46 @@ module Helene
             end
 
             def destroy_all
-              each{|record| record.destroy}
-            end
-
-            def delete_all
-              each{|record| record.delete}
-            end
-
-            def nullify_all
-              each do |record|
-                record.send("#{ foreign_key }=", nil)
-                record.send("#{ foreign_type }=", nil) if foreign_type
+              parent.transaction do
+                each do |record|
+                  record.destroy
+                  if foreign_keys
+                    ids = Array(parent.send(foreign_keys))
+                    ids -= Array(record.id)
+                    parent.put_attributes(foreign_keys => ids)
+                  end
+                end
               end
             end
 
+            def delete_all
+              parent.transaction do
+                each do |record|
+                  record.delete
+                  if foreign_keys
+                    ids = Array(parent.send(foreign_keys))
+                    ids -= Array(record.id)
+                    parent.put_attributes(foreign_keys => ids)
+                  end
+                end
+              end
+            end
+
+            def nullify_all
+              parent.transaction do
+                unless foreign_keys
+                  each do |record|
+                    record.send("#{ foreign_key }=", nil)
+                    record.send("#{ foreign_type }=", nil) if foreign_type
+                  end
+                else
+                  parent.put_attributes(foreign_keys => [])
+                end
+              end
+            end
+
+        # TODO - use batch_delete!
+        #
             def clear!
               case dependent
                 when :destroy
@@ -158,36 +220,35 @@ module Helene
               clear
             end
 
-            def reload
-              conditions = {}
-
-              foreign_type = association.foreign_type
-              foreign_key = association.foreign_key
-
-              if foreign_type
-                conditions[foreign_type] = parent_type
-              end
-
-              conditions[foreign_key] = parent_id
-
-              records = associated_class.select(:all, :conditions => conditions_for(conditions))
-              replace records
-              self
-            end
-
             def build(attributes = {})
-              record = parent_class.new(attributes)
-              record.send("#{ foreign_type }=", parent_type) if foreign_type
-              record.send("#{ foreign_key }=", parent_id)
-              self.push(record)
+              unless foreign_keys
+                record = parent_class.new(attributes)
+                record.send("#{ foreign_type }=", parent_type) if foreign_type
+                record.send("#{ foreign_key }=", parent_id)
+                self.push(record)
+              else
+                record = parent_class.new(attributes)
+                ids = Array(parent.send(foreign_keys))
+                ids += Array(record.id)
+                parent.send("#{ foreign_keys }=", ids)
+                #parent.put_attributes(foreign_keys => ids)
+                self.push(record)
+              end
               record
             end
 
             def associate(*records)
-              Array(records).flatten.each do |record|
-                record.send("#{ foreign_type }=", parent_type) if foreign_type
-                record.send("#{ foreign_key }=", parent_id)
-                self.push(record)
+              unless foreign_keys
+                Array(records).flatten.each do |record|
+                  record.send("#{ foreign_type }=", parent_type) if foreign_type
+                  record.send("#{ foreign_key }=", parent_id)
+                  self.push(record)
+                end
+              else
+                ids = Array(parent.send(foreign_keys))
+                ids += records.map{|record| record.id}
+                parent.send("#{ foreign_keys }=", ids)
+                #parent.put_attributes(foreign_keys => ids)
               end
             end
             
@@ -196,11 +257,21 @@ module Helene
             end
 
             def create(attributes = {})
-              build(attributes).save
+              created = nil
+              parent.transaction do
+                created = build(attributes).save
+                parent.save if foreign_keys
+              end
+              created
             end
 
             def create!(attributes = {})
-              build(attributes).save!
+              created = nil
+              parent.transaction do
+                created = build(attributes).save!
+                parent.save! if foreign_keys
+              end
+              created
             end
 
             def save
