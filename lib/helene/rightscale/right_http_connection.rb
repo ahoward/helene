@@ -181,7 +181,7 @@ them.
         STDERR.puts
         STDERR.puts caller.join("\n") 
         STDERR.puts
-        abort
+        raise
       end
     end
 
