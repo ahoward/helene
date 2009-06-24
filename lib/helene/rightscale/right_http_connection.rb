@@ -181,9 +181,26 @@ them.
         STDERR.puts
         STDERR.puts caller.join("\n") 
         STDERR.puts
-        raise
+        #raise
       end
     end
+
+=begin
+  /Users/ahoward/src/git/helene/lib/helene/rightscale/right_http_connection.rb:184:in `prevent_mt_use!'
+  /Users/ahoward/src/git/helene/lib/helene/rightscale/right_http_connection.rb:361:in `request'
+  /Users/ahoward/src/git/helene/lib/helene/rightscale/awsbase/right_awsbase.rb:351:in `request_info_impl'
+  /Users/ahoward/src/git/helene/lib/helene/rightscale/awsbase/benchmark_fix.rb:30:in `add!'
+  /Users/ahoward/src/git/helene/lib/helene/rightscale/awsbase/right_awsbase.rb:351:in `request_info_impl'
+  /Users/ahoward/src/git/helene/lib/helene/rightscale/s3/right_s3_interface.rb:169:in `request_info'
+  /Users/ahoward/src/git/helene/lib/helene/rightscale/s3/right_s3_interface.rb:285:in `list_bucket'
+  /Users/ahoward/src/git/helene/lib/helene/s3/bucket.rb:32:in `new'
+  /Users/ahoward/src/git/redfission/app/models/dropbox.rb:82:in `bucket'
+  /Users/ahoward/src/git/redfission/app/models/dropbox.rb:91:in `url_for'
+  /Users/ahoward/src/git/redfission/app/views/dropboxes/show.html.erb:143:in `_run_erb_app47views47dropboxes47show46html46erb'
+  /Users/ahoward/src/git/redfission/app/views/dropboxes/show.html.erb:139:in `each'
+  /Users/ahoward/src/git/redfission/app/views/dropboxes/show.html.erb:139:in `_run_erb_app47views47dropboxes47show46html46erb'
+  /Users/ahoward/src/git/redfission/lib/railsext.rb:164:in `perform_action_without_filters'
+=end
 
     def get_param(name)
       @params[name] || @@params[name]
