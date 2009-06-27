@@ -155,6 +155,7 @@ them.
      #
     def initialize(params={})
       @thread = Thread.current
+      @caller = caller
       @params = params
       @params[:http_connection_retry_count]  ||= @@params[:http_connection_retry_count]
       @params[:http_connection_open_timeout] ||= @@params[:http_connection_open_timeout]
@@ -176,31 +177,19 @@ them.
 
     def prevent_mt_use!
       unless Thread.current==@thread
-        STDERR.puts
-        STDERR.puts "#{ Thread.current.inspect } and  #{ @thread.inspect } both using #{ self.inspect }!"
-        STDERR.puts
-        STDERR.puts caller.join("\n") 
-        STDERR.puts
-        #raise
+        msg = <<-__
+        @thread : #{ @thread.inspect }
+        
+        @caller : #{ @caller.inspect }
+        
+        thread  : #{ Thread.current.inspect }
+        
+        caller  : #{ caller.inspect }
+        __
+        
+        raise ThreadError.new, msg
       end
     end
-
-=begin
-  /Users/ahoward/src/git/helene/lib/helene/rightscale/right_http_connection.rb:184:in `prevent_mt_use!'
-  /Users/ahoward/src/git/helene/lib/helene/rightscale/right_http_connection.rb:361:in `request'
-  /Users/ahoward/src/git/helene/lib/helene/rightscale/awsbase/right_awsbase.rb:351:in `request_info_impl'
-  /Users/ahoward/src/git/helene/lib/helene/rightscale/awsbase/benchmark_fix.rb:30:in `add!'
-  /Users/ahoward/src/git/helene/lib/helene/rightscale/awsbase/right_awsbase.rb:351:in `request_info_impl'
-  /Users/ahoward/src/git/helene/lib/helene/rightscale/s3/right_s3_interface.rb:169:in `request_info'
-  /Users/ahoward/src/git/helene/lib/helene/rightscale/s3/right_s3_interface.rb:285:in `list_bucket'
-  /Users/ahoward/src/git/helene/lib/helene/s3/bucket.rb:32:in `new'
-  /Users/ahoward/src/git/redfission/app/models/dropbox.rb:82:in `bucket'
-  /Users/ahoward/src/git/redfission/app/models/dropbox.rb:91:in `url_for'
-  /Users/ahoward/src/git/redfission/app/views/dropboxes/show.html.erb:143:in `_run_erb_app47views47dropboxes47show46html46erb'
-  /Users/ahoward/src/git/redfission/app/views/dropboxes/show.html.erb:139:in `each'
-  /Users/ahoward/src/git/redfission/app/views/dropboxes/show.html.erb:139:in `_run_erb_app47views47dropboxes47show46html46erb'
-  /Users/ahoward/src/git/redfission/lib/railsext.rb:164:in `perform_action_without_filters'
-=end
 
     def get_param(name)
       @params[name] || @@params[name]
@@ -375,7 +364,7 @@ them.
 
 =end
     def request(request_params, &block)
-      prevent_mt_use!
+      # prevent_mt_use!
       log_request(request_params) rescue nil
       # We save the offset here so that if we need to retry, we can return the file pointer to its initial position
       mypos = get_fileptr_offset(request_params)
@@ -495,7 +484,7 @@ them.
     end
 
     def finish(reason = '')
-      prevent_mt_use!
+      # prevent_mt_use!
       if @http && @http.started?
         reason = ", reason: '#{reason}'" unless reason.blank?
         log(:info, "Closing #{@http.use_ssl? ? 'HTTPS' : 'HTTP'} connection to #{@http.address}:#{@http.port}#{reason}")

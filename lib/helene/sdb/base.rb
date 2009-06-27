@@ -203,18 +203,18 @@ module Helene
           end
 
           results =
-            to_put.threadify(4, :each_slice, 25) do |slice|
+=begin
+            to_put.threadify(2, :each_slice, 25) do |slice|
               items = Hash[*slice.to_a.flatten]
               connection.batch_put_attributes(domain, items, options.update(:replace => replace))
             end.flatten
-=begin
+=end
           results = []
           to_put.each_slice(25) do |slice|
             items = Hash[*slice.to_a.flatten]
             results << connection.batch_put_attributes(domain, items, options.update(:replace => replace))
           end
           results.flatten!
-=end
 
           records.each do |record|
             record.virtually_load(record.ruby_to_sdb)
@@ -377,7 +377,10 @@ module Helene
                 if block
                   ids.each_slice(20){|slice| execute_select(*[slice, options], &block)}
                 else
-                  records = ids.threadify(4, :each_slice, 20){|slice| execute_select(*[slice, options])}.flatten
+                  # records = ids.threadify(2, :each_slice, 20){|slice| execute_select(*[slice, options])}.flatten
+                  records = []
+                  ids.each_slice(20){|slice| records.push execute_select(*[slice, options])}
+                  records.flatten!
                   return(limit ? records[0,limit] : records)
                 end
               end

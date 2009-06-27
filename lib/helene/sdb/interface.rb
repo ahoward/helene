@@ -69,12 +69,14 @@ module Helene
 #
       def request_info(request, parser)  #:nodoc:
         #thread = @params[:multi_thread] ? Thread.current : Thread.main
-        thread = Thread.current
-        thread[:sdb_connection] ||= Rightscale::HttpConnection.new(:exception => AwsError, :logger => @logger)
+        #thread = Thread.current
+        #thread[:sdb_connection] ||= Rightscale::HttpConnection.new(:exception => AwsError, :logger => @logger)
+        @connection ||= Rightscale::HttpConnection.new(:exception => AwsError, :logger => @logger)
         e = nil
         # 42.times do
         #   begin
-            return request_info_impl(thread[:sdb_connection], @@bench, request, parser)
+            #return request_info_impl(thread[:sdb_connection], @@bench, request, parser)
+            return request_info_impl(@connection, @@bench, request, parser)
         #   rescue Object => e
         #     raise unless e.class <= StandardError
         #     @logger.error{ e } rescue nil

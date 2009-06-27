@@ -1,7 +1,7 @@
 module Helene
 # version
 #
-  Helene::VERSION = '0.0.0' unless defined?(Helene::VERSION)
+  Helene::VERSION = '0.0.1' unless defined?(Helene::VERSION)
   def Helene.version() Helene::VERSION end
 
 # ruby built-ins
@@ -91,6 +91,7 @@ module Helene
     load 'util.rb'
     load 'sleepcycle.rb'
     load 'superhash.rb'
+    load 'objectpool.rb'
     load 'attempt.rb'
     load 'content_type.rb'
     load 'logging.rb'
