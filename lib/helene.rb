@@ -1,7 +1,7 @@
 module Helene
 # version
 #
-  Helene::VERSION = '0.0.2' unless defined?(Helene::VERSION)
+  Helene::VERSION = '0.0.3' unless defined?(Helene::VERSION)
   def Helene.version() Helene::VERSION end
 
 # ruby built-ins

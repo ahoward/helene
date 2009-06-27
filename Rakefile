@@ -11,6 +11,7 @@ end
 task :gemspec do
   ignore_extensions = 'git', 'svn', 'tmp', /sw./, 'bak', 'gem'
   ignore_directories = 'pkg'
+  ignore_files = 'test/log'
 
   shiteless = 
     lambda do |list|
@@ -23,6 +24,11 @@ task :gemspec do
         next unless test(?d, entry)
         dirname = File.expand_path(entry)
         ignore_directories.any?{|dir| File.expand_path(dir) == dirname}
+      end
+      list.delete_if do |entry|
+        next unless test(?f, entry)
+        filename = File.expand_path(entry)
+        ignore_files.any?{|file| File.expand_path(file) == filename}
       end
     end
 
