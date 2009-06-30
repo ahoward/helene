@@ -18,8 +18,7 @@ testing Helene::Sdb::Base do
         end
       end
       eventually_assert(perform) do
-        result = @a.find(:all, :limit => n)
-        assert result.size == n
+        assert @a.count >= n
       end
     end
   end

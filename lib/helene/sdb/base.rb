@@ -775,7 +775,7 @@ module Helene
           options[:select] = Literal('count(*)')
           sql = sql_for_select(options)
           result = connection.select(sql, &block)
-          Integer(result[:items].first['Domain']['Count'].first) rescue(raise(Error, result.inspect))
+          Integer(Array(result[:items].first['Domain']['Count']).first) rescue(raise(Error, result.inspect))
         end
       end
 

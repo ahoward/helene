@@ -31,6 +31,8 @@ module Helene
         @connection ||= ConnectionProxy.new
       end
     end
-    @connections = ObjectPool.new(:size => 4){ create_connection }
+    @connections = ObjectPool.new(:size => 8){ create_connection }
+    #@connections = Array.new(8){ create_connection }
+    #@connections = ObjectPool.new *@connections
   end
 end
