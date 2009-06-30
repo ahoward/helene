@@ -186,7 +186,7 @@ module Helene
           strategy = options[:strategy] || :parallel # or :serial
           threads = Float(options[:threads] || 8).to_i
 
-          if false #strategy.to_s =~ %r/parallel/
+          if strategy.to_s =~ %r/parallel/
             slices = [] and enum.each_slice(size){|slice| slices << slice}
             results =
               slices.threadify(threads) do |slice|
