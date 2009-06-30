@@ -66,6 +66,7 @@ module Helene
           unless free.empty?
             object = free[ rand(free.size) ]
             @used[object] = Thread.current
+# puts "#{ Thread.current.object_id } using #{ object.inspect }"
             return object
           end
 

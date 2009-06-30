@@ -177,6 +177,33 @@ module Helene
           record
         end
 
+      # batch helper
+      #
+        def in_batches_of(*args, &block)
+          options = args.extract_options!.to_options!
+          size = Float(args.size > 0 ? args.shift : (options[:n] || options[:size])).to_i
+          enum = args.size > 0 ? args.shift : options[:from]
+          strategy = options[:strategy] || :parallel # or :serial
+          threads = Float(options[:threads] || 8).to_i
+
+          if strategy.to_s =~ %r/parallel/
+            slices = [] and enum.each_slice(size){|slice| slices << slice}
+            results =
+              slices.threadify(threads) do |slice|
+                block.call(slice)
+              end
+            results.flatten!
+            results
+          else
+            results = []
+            enum.each_slice(size) do |slice|
+              results.push(block.call(slice))
+            end
+            results.flatten!
+            results
+          end
+        end
+
       # batch create/update
       #
         def save_without_validation(*records)
@@ -203,18 +230,10 @@ module Helene
           end
 
           results =
-=begin
-            to_put.threadify(2, :each_slice, 25) do |slice|
-              items = Hash[*slice.to_a.flatten]
+            in_batches_of(25, :from => to_put) do |batch|
+              items = Hash[*batch.to_a.flatten]
               connection.batch_put_attributes(domain, items, options.update(:replace => replace))
-            end.flatten
-=end
-          results = []
-          to_put.each_slice(25) do |slice|
-            items = Hash[*slice.to_a.flatten]
-            results << connection.batch_put_attributes(domain, items, options.update(:replace => replace))
-          end
-          results.flatten!
+            end
 
           records.each do |record|
             record.virtually_load(record.ruby_to_sdb)
@@ -377,10 +396,7 @@ module Helene
                 if block
                   ids.each_slice(20){|slice| execute_select(*[slice, options], &block)}
                 else
-                  # records = ids.threadify(2, :each_slice, 20){|slice| execute_select(*[slice, options])}.flatten
-                  records = []
-                  ids.each_slice(20){|slice| records.push execute_select(*[slice, options])}
-                  records.flatten!
+                  records = in_batches_of(2500, :from => ids){|batch| execute_select(*[batch, options])}.flatten
                   return(limit ? records[0,limit] : records)
                 end
               end

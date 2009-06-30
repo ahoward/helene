@@ -9,13 +9,13 @@ testing Helene::Sdb::Base do
     should perform do
       n = 2501
       assert_nothing_raised do
-        # if @a.count < n
+        if @a.count < n
           records = Array.new(n){ @a.new }
           a = Time.now.to_f
           @a.batch_put records
           b = Time.now.to_f
           #puts(b - a)
-        # end
+        end
       end
       eventually_assert(perform) do
         result = @a.find(:all, :limit => n)

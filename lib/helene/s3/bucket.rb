@@ -158,6 +158,12 @@ module Helene
         key.get(headers)
       end
 
+# TODO - return a blob?
+      def read(path, *args, &block)
+        get(path, *args, &block).data
+      end
+
+# TODO - handle string inputs better
       def io_for(arg)
         return(arg.respond_to?(:read) ? yield(arg) : open(arg.to_s){|io| yield(io)})
       end
@@ -170,7 +176,7 @@ module Helene
             break path
           end
         end
-        raise Errror, "no path from #{ arg.inspect }" if path.blank?
+        raise Error, "no path from #{ arg.inspect }" if path.blank?
         cleanpath(path)
       end
 
