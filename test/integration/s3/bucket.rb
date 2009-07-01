@@ -57,6 +57,63 @@ testing Bucket = Helene::S3::Bucket do
         data = assert{ bucket.get(key.name) }
         assert{ data == @data }
       end
+    
+      context "with a prefix set" do
+        setup do
+          bucket.prefix = @prefix = "test_prefix"
+        end
+        teardown do
+          bucket.prefix = nil
+        end
+      
+        should "put under the prefix" do
+          key = assert{ bucket.put(@pathname) }
+          assert{ key.url.include?("/#{@prefix}/") }
+        end
+
+        should "get under the prefix" do
+          # ensure Bucket is empty
+          clear_bucket
+          
+          # should be nothing there
+          assert{
+            begin
+              bucket.get(@pathname).nil?
+              false
+            rescue RightAws::AwsError
+              true
+            end
+          }
+          
+          # now add the data
+          key = assert{ bucket.put(@pathname) }
+          
+          # 
+          # ensure that we can now read the data back
+          # (without an explicit prefix)
+          # 
+          data = assert{ bucket.get(key.name) }
+          assert{ data == @data }
+        end
+
+        should "list under the prefix" do
+          # ensure Bucket is empty
+          clear_bucket
+
+          # add a file *not* under the prifx
+          bucket.prefix = nil
+          assert{ bucket.put(@pathname) }
+          assert{ !bucket.ls.empty? }
+          
+          # ensure the listing is still empty under the prefix
+          bucket.prefix = @prefix
+          assert{ bucket.ls.empty? }
+          
+          # add another under the prefix
+          assert{ bucket.put(@pathname) }
+          assert{ !bucket.ls.empty? }
+        end
+      end
     end
   end
 
@@ -96,6 +153,15 @@ testing Bucket = Helene::S3::Bucket do
     create_bucket unless @bucket
     assert{ Bucket.delete(@bucket, options) }
     @bucket = nil
+  end
+  
+  def clear_bucket(options = {})
+    old_prefix    = bucket.prefix
+    bucket.prefix = nil              # remove prefix so we get all files
+    assert{ bucket.clear(options) }
+    assert{ bucket.ls.empty? }       # ensure it is empty
+  ensure
+    bucket.prefix = old_prefix       # restore prefix
   end
 
   def curl(url, options = {})

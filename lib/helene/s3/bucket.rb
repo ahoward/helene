@@ -114,6 +114,8 @@ module Helene
         absolute = path =~ %r|^/|
         if absolute
           path[1..-1]
+        elsif @prefix and path =~ /\A#{Regexp.escape(@prefix)}/
+          path  # don't add a prefix if it was already there
         else
           return scoping(path, &block) if block
           @prefix ? File.join(@prefix, path) : path
