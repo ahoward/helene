@@ -29,10 +29,10 @@ testing Helene::Sdb::Base do
     should perform do
       a = assert{ @a.create! }
       ids = Array.new(42){ a.id }
-      eventually_assert(perform) do
+      #eventually_assert(perform) do
         list = assert{ @a.find(ids) }
         list and list.all?{|found| found.id == a.id}
-      end
+      #end
     end
   end
 

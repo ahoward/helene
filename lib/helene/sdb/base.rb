@@ -1,4 +1,3 @@
- 
 module Helene
   module Sdb
     class Base
@@ -396,7 +395,7 @@ module Helene
                 if block
                   ids.each_slice(20){|slice| execute_select(*[slice, options], &block)}
                 else
-                  records = in_batches_of(2500, :from => ids){|batch| execute_select(*[batch, options])}.flatten
+                  records = in_batches_of(20, :from => ids){|batch| execute_select(*[batch, options])}.flatten
                   return(limit ? records[0,limit] : records)
                 end
               end

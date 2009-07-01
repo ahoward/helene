@@ -4,15 +4,13 @@ module Helene
       def create_connection(*args)
         options = args.extract_options!.to_options!
 
-        aws_access_key_id =
-          options.delete(:aws_access_key_id) || args.shift || Helene.aws_access_key_id
+        access_key_id =
+          options.delete(:access_key_id) || args.shift || Helene.access_key_id
 
-        aws_secret_access_key =
-          options.delete(:aws_secret_access_key) || args.shift || Helene.aws_secret_access_key
+        secret_access_key =
+          options.delete(:secret_access_key) || args.shift || Helene.secret_access_key
 
-        # options[:multi_thread] = true unless options.has_key?(:multi_thread)
-
-        Interface.new(aws_access_key_id, aws_secret_access_key, options)
+        Interface.new(access_key_id, secret_access_key, options)
       end
 
       def connections(&block)
@@ -31,8 +29,7 @@ module Helene
         @connection ||= ConnectionProxy.new
       end
     end
+
     @connections = ObjectPool.new(:size => 8){ create_connection }
-    #@connections = Array.new(8){ create_connection }
-    #@connections = ObjectPool.new *@connections
   end
 end

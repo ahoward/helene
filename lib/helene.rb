@@ -96,7 +96,7 @@ module Helene
     load 'content_type.rb'
     load 'logging.rb'
     load 'config.rb'
-    load 'aws.rb'
+    load 'settings.rb'
     load 'sdb.rb'
     load 's3.rb'
     load 'rails.rb' if defined?(Rails)

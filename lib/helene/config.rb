@@ -1,62 +1,84 @@
 module Helene
   class Config
-    def Config.for(arg)
-      config = new
-      updates =
-        case arg
-          when Hash
-            arg
-          when NilClass
-            {}
-          else
-            if arg.respond_to?(:read)
-              YAML.load(arg.read)
+    class << Config
+      def for(arg)
+        config = new
+        updates =
+          case arg
+            when Hash
+              arg
+            when NilClass
+              {}
             else
-              YAML.load(IO.read(arg.to_s))
-            end
-        end
-      config.update(updates)
-      config
-    end
-
-    def Config.default_path
-      File.join(Helene::Util.homedir, '.helene.yml')
-    end
-
-    def Config.default
-      @default ||= (
-        update_from_env(
-          begin
-            Config.for(default_path)
-          rescue Errno::ENOENT
-            Config.for(nil)
+              if arg.respond_to?(:read)
+                YAML.load(arg.read)
+              else
+                YAML.load(IO.read(arg.to_s))
+              end
           end
-        )
-      )
-    end
-
-    def Config.update_from_env config
-=begin
-      username = ENV['GNIP_USERNAME']
-      password = ENV['GNIP_PASSWORD']
-      auth = ENV['GNIP_AUTH']
-      if(auth and not (username and password))
-        username, password = auth.split(%r/:/, 2)
+        config.update(updates)
+        config
       end
-      uri = ENV['GNIP_URI'] || Helene.default.uri
-      config.username = username if username
-      config.password = password if password
-      config.uri = uri if uri
-      config
-=end
-    end
 
-    def Config.normalized hash
-      stringified_keys(hash)
-    end
+      def default_path
+        File.join(Helene::Util.homedir, '.helene.yml')
+      end
 
-    def Config.stringified_keys hash
-      hash.keys.inject(Hash.new){|h,k| h.update(k.to_s => hash.fetch(k))}
+      def default
+        @default ||= (
+          update_from_env(
+            begin
+              Config.for(default_path)
+            rescue Errno::ENOENT
+              Config.for(nil)
+            end
+          )
+        )
+      end
+
+      def update_from_env config
+        keys_for(:ACCESS_KEY_ID).each do |key|
+          value_for(key) do |value|
+            config.access_key_id = value
+          end
+        end
+
+        keys_for(:SECRET_ACCESS_KEY).each do |key|
+          value_for(key) do |value|
+            config.secret_access_key = value
+          end
+        end
+
+        keys_for(:CA_FILE).each do |key|
+          value_for(key) do |value|
+            config.ca_file = value
+          end
+        end
+
+        config
+      end
+
+      def keys_for key
+        key = key.to_s.strip.upcase
+        [key, "AWS_#{ key }", "HELENE_#{ key }"]
+      end
+
+      def value_for key
+        if Object.const_defined?(key)
+          return yield(Object.const_get(key))
+        end
+        if ENV[key]
+          return yield(ENV[key])
+        end
+      end
+
+      def normalized hash
+        stringified_keys(hash)
+      end
+
+      def stringified_keys hash
+        hash.keys.inject(Hash.new){|h,k| h.update(k.to_s => hash.fetch(k))}
+      end
     end
 
     attr :config
@@ -79,25 +101,16 @@ module Helene
       to_hash.to_yaml(*args, &block)
     end
 
-    def username= username
-      config['username'] = username.to_s
-    end
-    def username
-      config['username'].to_s
-    end
-
-    def password= password
-      config['password'] = password.to_s
-    end
-    def password
-      config['password'].to_s
-    end
-
-    def uri= uri
-      config['uri'] = uri.to_s
-    end
-    def uri
-      URI.parse(config['uri'].to_s) if config['uri']
+    %w( access_key_id secret_access_key ca_file ).each do |key|
+      code = <<-__
+        def #{ key }= #{ key }
+          config['#{ key }'] = #{ key }.to_s
+        end
+        def #{ key }
+          config['#{ key }'].to_s
+        end
+      __
+      module_eval(code)
     end
 
     def inspect

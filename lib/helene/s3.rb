@@ -5,12 +5,12 @@ module Helene
         Thread.current
       end
 
-      def establish_connection(aws_access_key_id=Helene.aws_access_key_id, aws_secret_access_key=Helene.aws_secret_access_key, options={})
+      def establish_connection(access_key_id=Helene.access_key_id, secret_access_key=Helene.secret_access_key, options={})
         options.to_options!
-        thread[:helene_s3_interface] = RightAws::S3Interface.new(aws_access_key_id, aws_secret_access_key, options)
+        thread[:helene_s3_interface] = RightAws::S3Interface.new(access_key_id, secret_access_key, options)
         raise Error, 'Connection to S3 is not established' unless thread[:helene_s3_interface]
 
-        thread[:helene_s3_generator] = RightAws::S3Generator.new(aws_access_key_id, aws_secret_access_key)
+        thread[:helene_s3_generator] = RightAws::S3Generator.new(access_key_id, secret_access_key)
         raise Error, 'Connection to S3 is not established' unless thread[:helene_s3_generator]
       end
 
