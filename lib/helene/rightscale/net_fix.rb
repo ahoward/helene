@@ -25,6 +25,8 @@
 # Net::HTTP and Net::HTTPGenericRequest fixes to support 100-continue on 
 # POST and PUT. The request must have 'expect' field set to '100-continue'.
 
+require 'net/http'
+
 
 module Net
   
@@ -78,19 +80,29 @@ module Net
       @@local_read_size
     end
 
-    def exec(sock, ver, path, send_only=nil)   #:nodoc: internal use only
-      if @body
-        send_request_with_body sock, ver, path, @body, send_only
-      elsif @body_stream
-        send_request_with_body_stream sock, ver, path, @body_stream, send_only
+    def exec(sock, ver, path, *send_only)   #:nodoc: internal use only
+      unless send_only.empty?
+        send_only = send_only.first
+        if @body
+          right_send_request_with_body sock, ver, path, @body, send_only
+        elsif @body_stream
+          right_send_request_with_body_stream sock, ver, path, @body_stream, send_only
+        else
+          write_header(sock, ver, path)
+        end
       else
-        write_header(sock, ver, path)
+        if @body
+          send_request_with_body sock, ver, path, @body
+        elsif @body_stream
+          send_request_with_body_stream sock, ver, path, @body_stream
+        else
+          write_header(sock, ver, path)
+        end
       end
     end
 
-    private
-
-    def send_request_with_body(sock, ver, path, body, send_only=nil)
+  private
+    def right_send_request_with_body(sock, ver, path, body, send_only=nil)
       self.content_length = body.length
       delete 'Transfer-Encoding'
       supply_default_content_type
@@ -98,7 +110,7 @@ module Net
       sock.write(body)              unless send_only == :header
     end
 
-    def send_request_with_body_stream(sock, ver, path, f, send_only=nil)
+    def right_send_request_with_body_stream(sock, ver, path, f, send_only=nil)
       unless content_length() or chunked?
         raise ArgumentError,
             "Content-Length not given and Transfer-Encoding is not `chunked'"
@@ -158,3 +170,4 @@ module Net
   end
 
 end
+
