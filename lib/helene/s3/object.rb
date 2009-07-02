@@ -32,7 +32,7 @@ module Helene
       end
 
       attr_accessor :bucket
-      attr_accessor :name
+      attr_accessor :key
       attr_accessor :last_modified
       attr_accessor :e_tag
       attr_accessor :size
@@ -47,7 +47,7 @@ module Helene
       def initialize(*args)
         options = args.extract_options!.to_options!
         @bucket = args.shift || options[:bucket] 
-        @name = args.shift || options[:name] || options[:key]
+        @key = args.shift || options[:key] || options[:name]
         @data = args.shift || options[:data]
 
         @e_tag         = options[:e_tag]
@@ -57,6 +57,8 @@ module Helene
         @size          = options[:size]
         @headers       = options[:headers]||{}
         @meta_headers  = options[:meta_headers]||options[:meta]||{}
+
+        @key = Key.for(@key)
          
         if @last_modified && !@last_modified.is_a?(Time) 
           @last_modified = Time.parse(@last_modified)
@@ -76,14 +78,15 @@ module Helene
         headers = options.delete(:headers) || {}
         case args.shift.to_s
           when '', 'get'
-            bucket.interface.get_link(bucket, name.to_s, expires, headers)
+            bucket.interface.get_link(bucket, key, expires, headers)
         end
       end
       alias_method :url_for, :url
       
       def to_s
-        @name.to_s
+        @key.to_s
       end
+      alias_method 'name', 'to_s'
       
       def data
         get if !@data and exists?
@@ -91,7 +94,7 @@ module Helene
       end
       
       def get(headers={})
-        response = @bucket.interface.get(@bucket.name, @name, headers)
+        response = @bucket.interface.get(@bucket.name, @key, headers)
         @data    = response[:object]
         @headers, @meta_headers = Object.partition_into_meta_headers(response[:headers])
         refresh(false)
@@ -102,28 +105,28 @@ module Helene
         headers[ACLHeader] = perms if perms
         @data = data || @data
         meta  = Object.meta_prefixed(@meta_headers)
-        @bucket.interface.put(@bucket.name, @name, @data, meta.merge(headers))
+        @bucket.interface.put(@bucket.name, @key, @data, meta.merge(headers))
       end
       
       def rename(new_name)
-        @bucket.interface.rename(@bucket.name, @name, new_name)
-        @name = new_name
+        @bucket.interface.rename(@bucket.name, @key, new_name)
+        @key = Key.for(new_name)
       end
       
       def copy(new_key_or_name)
         new_key_or_name = Object.create(@bucket, new_key_or_name.to_s) unless new_key_or_name.is_a?(Object)
-        @bucket.interface.copy(@bucket.name, @name, new_key_or_name.bucket.name, new_key_or_name.name)
-        new_key_or_name
+        @bucket.interface.copy(@bucket.name, @key, new_key_or_name.bucket.name, new_key_or_name.name)
+        Key.for(new_key_or_name)
       end
 
       def move(new_key_or_name)
         new_key_or_name = Object.create(@bucket, new_key_or_name.to_s) unless new_key_or_name.is_a?(Object)
         @bucket.interface.move(@bucket.name, @name, new_key_or_name.bucket.name, new_key_or_name.name)
-        new_key_or_name
+        Key.for(new_key_or_name)
       end
       
       def refresh(head=true)
-        new_key        = @bucket.find_or_create_object_by_absolute_path(name)
+        new_key        = @bucket.find_or_create_object_by_absolute_path(key)
         @last_modified = new_key.last_modified
         @e_tag         = new_key.e_tag
         @size          = new_key.size
@@ -139,28 +142,28 @@ module Helene
       end
 
       def head
-        @headers, @meta_headers = Object.partition_into_meta_headers(@bucket.interface.head(@bucket, @name))
+        @headers, @meta_headers = Object.partition_into_meta_headers(@bucket.interface.head(@bucket, @key))
         true
       end
       
       def reload_meta
-        @meta_headers = Object.partition_into_meta_headers(@bucket.interface.head(@bucket, @name)).last
+        @meta_headers = Object.partition_into_meta_headers(@bucket.interface.head(@bucket, @key)).last
       end
       
       def save_meta(meta_headers)
         meta = Object.meta_prefixed(meta_headers)
-        @bucket.interface.copy(@bucket.name, @name, @bucket.name, @name, :replace, meta)
+        @bucket.interface.copy(@bucket.name, @key, @bucket.name, @key, :replace, meta)
         @meta_headers = Object.partition_into_meta_headers(meta).last
       end
  
       def exists?
-        @bucket.find_or_create_object_by_absolute_path(name).last_modified ? true : false
+        @bucket.find_or_create_object_by_absolute_path(key).last_modified ? true : false
       end
 
       
       def delete
-        raise 'Object name must be specified.' if @name.blank?
-        @bucket.interface.delete(@bucket, @name) 
+        raise 'Object key must be specified.' if @key.blank?
+        @bucket.interface.delete(@bucket, @key) 
       end
       
       def grantees

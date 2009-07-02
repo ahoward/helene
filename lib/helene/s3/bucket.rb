@@ -114,16 +114,10 @@ module Helene
         name == other.name and prefix == other.prefix
       end
 
-      def prefixed_key_for(key)
+      def key_for(key, options = {})
         return key if key.is_a?(Key)
-        Key.new(key.to_s, :prefix => @prefix)
-      end
-
-      def prefixed_key_from(key)
-        return key if key.is_a?(Key)
-        key = key.to_s
-        key[%r/\A#{ Regexp.escape(@prefix) }/] = '' if @prefix
-        Key.new(key, :prefix => @prefix)
+        options.to_options!
+        options[:prefix]==false ? Key.new(key) : Key.new(@prefix, key)
       end
 
       def scoping(suffix, &block)
@@ -213,7 +207,7 @@ module Helene
 
       def object_for(arg, io = nil, meta = {})
         return arg if arg.is_a?(Object)
-        Object.new(bucket, prefixed_key_for(arg), :data => io, :meta => meta)
+        Object.new(bucket, key_for(arg), :data => io, :meta => meta)
       end
 
       def headers_for(path, headers = {})
@@ -247,17 +241,17 @@ module Helene
             (query ||= {})[:prefix] ||= prefix if prefix
             interface.list_bucket_link(name, query, expires, headers)
           when 'put'
-            interface.put_link(name, prefixed_key_for(path), data, expires, headers)
+            interface.put_link(name, key_for(path), data, expires, headers)
           when 'get'
-            interface.get_link(name, prefixed_key_for(path), expires, headers)
+            interface.get_link(name, key_for(path), expires, headers)
           when 'head'
-            interface.head_link(name, prefixed_key_for(path), expires, headers)
+            interface.head_link(name, key_for(path), expires, headers)
           when 'delete'
-            interface.delete_link(name, prefixed_key_for(path), expires, headers)
+            interface.delete_link(name, key_for(path), expires, headers)
           when 'get_acl'
-            interface.get_acl_link(name, prefixed_key_for(path), headers)
+            interface.get_acl_link(name, key_for(path), headers)
           when 'put_acl'
-            interface.put_acl_link(name, prefixed_key_for(path), headers)
+            interface.put_acl_link(name, key_for(path), headers)
           when 'get_bucket_acl'
             interface.get_bucket_acl_link(name, headers)
           when 'put_bucket_acl'
@@ -282,13 +276,13 @@ module Helene
         Bucket.destroy(bucket, options)
       end
 
-      def objects(options={}, &block)
+      def list(options={}, &block)
         options.to_options!
         options[:prefix] ||= prefix
         options.delete(:service)
         each_object(options, &block)
       end
-      alias_method 'list', 'objects'
+      alias_method 'objects', 'list'
 
       def ls(options = {}, &block)
         names = []
@@ -314,7 +308,7 @@ module Helene
             object = 
               Object.new(
                 :bucket => bucket,
-                :key => prefixed_key_from(entry[:key]),
+                :key => key_for(entry[:key], :prefix => false),
                 :last_modified => entry[:last_modified],
                 :e_tag => entry[:e_tag],
                 :size => entry[:size],
@@ -337,7 +331,7 @@ module Helene
 
       def object(path, options={}, &block)
         options.to_options!
-        options[:prefix] ||= prefixed_key_for(path)
+        options[:prefix] ||= key_for(path)
         objects(options).first
       end
       alias_method '[]', 'object'
@@ -356,26 +350,26 @@ module Helene
       end
 
       def has_key?(path)
-        find_or_create_object_by_absolute_path(prefixed_key_for(path)).exists?
+        find_or_create_object_by_absolute_path(key_for(path)).exists?
       end
 
       def rename_object(src, dst)
-        src = Object.new(bucket, prefixed_key_for(src)) unless src.is_a?(Object)
-        src.rename(prefixed_key_for(dst))
+        src = Object.new(bucket, key_for(src)) unless src.is_a?(Object)
+        src.rename(key_for(dst))
         src
       end
       alias_method 'rename', 'rename_object'
 
       def copy_object(src, dst)
-        src = Object.new(bucket, prefixed_key_for(src)) unless src.is_a?(Object)
-        src.copy(prefixed_key_for(dst))
+        src = Object.new(bucket, key_for(src)) unless src.is_a?(Object)
+        src.copy(key_for(dst))
       end
       alias_method 'cp', 'copy_object'
       alias_method 'copy', 'copy_object'
       
       def move_object(src, dst)
-        src = Object.new(bucket, prefixed_key_for(src)) unless src.is_a?(Object)
-        src.move(prefixed_key_for(dst))
+        src = Object.new(bucket, key_for(src)) unless src.is_a?(Object)
+        src.move(key_for(dst))
       end
       alias_method 'mv', 'move_object'
       alias_method 'move', 'move_object'

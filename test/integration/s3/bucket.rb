@@ -53,7 +53,7 @@ testing Bucket = Helene::S3::Bucket do
 
       should "be able to put/get a path" do
         object = assert{ bucket.put(@pathname) }
-        data = assert{ bucket.get(object.name).data }
+        data = assert{ bucket.get(object.key).data }
         assert{ data == @data }
       end
     
@@ -91,7 +91,7 @@ testing Bucket = Helene::S3::Bucket do
           # ensure that we can now read the data back
           # (without an explicit prefix)
           # 
-          data = assert{ bucket.get(object.name).data }
+          data = assert{ bucket.get(object.key).data }
           assert{ data == @data }
         end
 
@@ -116,7 +116,7 @@ testing Bucket = Helene::S3::Bucket do
 
       should "be able to crossdomain-ize" do
         object = assert{ bucket.crossdomain! }
-        data = assert{ bucket.get(object.name).data }
+        data = assert{ bucket.get(object.key).data }
         assert{ data['<cross-domain-policy>'] }
         assert{ bucket.crossdomain? }
       end
