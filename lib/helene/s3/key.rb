@@ -10,6 +10,7 @@ module Helene
           key.sub!(%r|/+$|, '')
           key
         end
+        alias_method 'cleanpath', 'clean'
       end
 
       attr_accessor :prefix

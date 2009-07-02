@@ -21,6 +21,14 @@ module Helene
         end
         alias_method 'buckets', 'list'
 
+        def ls(&block)
+          result = []
+          list.each do |bucket|
+            block ? block.call(bucket.name) : result.push(bucket.name)
+          end
+          block ? nil : result
+        end
+
         def create(name, options = {})
           options.to_options!
           headers = options.delete(:headers) || {}
@@ -68,6 +76,7 @@ module Helene
           name = bucket.is_a?(Bucket) ? bucket.name : bucket.to_s
           force ? interface.force_delete_bucket(name) : interface.delete_bucket(name)
         end
+        alias_method 'destroy', 'delete'
       end
 
       attr_accessor :name
@@ -104,19 +113,6 @@ module Helene
         name == other.name and prefix == other.prefix
       end
 
-      def prefixed(path, &block)
-        path = path.to_s
-        absolute = path =~ %r|^/|
-        if absolute
-          path[1..-1]
-        elsif @prefix and path =~ /\A#{Regexp.escape(@prefix)}/
-          path  # don't add a prefix if it was already there
-        else
-          return scoping(path, &block) if block
-          @prefix ? File.join(@prefix, path) : path
-        end
-      end
-
       def prefixed_key_for(key)
         return key if key.is_a?(Key)
         Key.new(key.to_s, :prefix => @prefix)
@@ -137,6 +133,7 @@ module Helene
         @prefix = old
       end
       alias_method 'suffixing', 'scoping'
+      alias_method 'prefixed', 'scoping'
 
       def / suffix
         bucket = clone
@@ -144,21 +141,38 @@ module Helene
         bucket
       end
 
-      def put(data, *args, &block)
+      def put(arg, *args, &block)
         options = args.extract_options!.to_options!
 
         meta = options.delete(:meta) || {}
         perms = options.delete(:perms)
         headers = options.delete(:headers) || {}
 
-        io_for(data) do |io|
-          path = args.shift || path_for(io)
-          object = object_for(path, io, meta)
+        data_for(arg) do |data|
+          path = args.shift || path_for(data)
+#p :data=>data
+#p :path=>path
+#abort
+          object = object_for(path, data, meta)
           headers = headers_for(path, headers)
-          object.put(io, perms, headers)
+          object.put(data, perms, headers)
           object
         end
       end
+
+      def put_data(arg, *args, &block)
+        if arg.is_a?(Pathname)
+          arg.open{|fd| put(fd, *args, &block)}
+        else
+          put(arg, *args, &block)
+        end
+      end
+      alias_method 'write', 'put_data'
+
+      def put_path(path, *args, &block)
+        put(Pathname.new(path.to_s), *args, &block)
+      end
+      alias_method 'put_pathname', 'put_path'
 
       def get(path, *args, &block)
         options = args.extract_options!.to_options!
@@ -167,17 +181,24 @@ module Helene
         object.get(headers)
       end
 
-      def read(path, *args, &block)
+      def data(path, *args, &block)
         get(path, *args, &block).data
       end
+      alias_method 'read', 'data'
+      alias_method 'get_data', 'data'
 
-# TODO - handle string inputs better - perhaps accepting only pathnames where
-# they are meant and strings==data?
-      def io_for(arg)
-        return(arg.respond_to?(:read) ? yield(arg) : open(arg.to_s){|io| yield(io)})
+      def data_for(arg)
+        if arg.is_a?(Pathname)
+          open(arg.to_s){|io| return yield(io)}
+        end
+        if arg.respond_to?(:read)
+          return yield(arg)
+        end
+        return yield(arg.to_s)
       end
 
       def path_for(arg)
+        return arg.to_s if arg.is_a?(Pathname)
         path = nil
         %w[ path pathname filename ].each do |msg|
           if arg.respond_to?(msg)
@@ -256,11 +277,15 @@ module Helene
         end
       end
 
+      def destroy(options = {})
+        Bucket.destroy(bucket, options)
+      end
+
       def objects(options={}, &block)
         options.to_options!
         options[:prefix] ||= prefix
         options.delete(:service)
-        objects_and_service(options, &block)
+        each_object(options, &block)
       end
       alias_method 'list', 'objects'
 
@@ -272,9 +297,9 @@ module Helene
         block ? nil : names
       end
 
-    # TODO - refactor messiness with service
+    # TODO - clean up old cruft with 'service' option
     #
-      def objects_and_service(options={}, &block)
+      def each_object(options={}, &block)
         options.to_options!
         options[:prefix] ||= prefix
         head = options.delete(:head)

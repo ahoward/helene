@@ -37,9 +37,8 @@ testing Bucket = Helene::S3::Bucket do
 
     context 'at the instance level' do
       setup do
-        @pathname = File.expand_path(__FILE__)
-        @basename = File.basename(@pathname)
-        @data = IO.read(@pathname)
+        @pathname = Pathname.new(__FILE__).realpath
+        @data = @pathname.read
       end
 
       should 'be able to put a pathname' do
@@ -48,7 +47,7 @@ testing Bucket = Helene::S3::Bucket do
       end
 
       should "be able to put an io - returning an object that knows it's url" do
-        object = assert{ open(@pathname){|io| bucket.put(io)} }
+        object = assert{ @pathname.open{|io| bucket.put(io)} }
         assert{ curl(object.url) == @data }
       end
 
@@ -128,6 +127,7 @@ testing Bucket = Helene::S3::Bucket do
     @bucket ||= assert{ Bucket.create(bucket_name, options) }
     # at_exit{ @bucket.delete(:force => true) rescue nil if @bucket unless $! }
     at_exit{ Bucket.delete(@bucket, :force => true) rescue nil if @bucket }
+    at_exit{ Helene::S3::Bucket.list.map{|b| b.destroy(:force=>true) if b.name =~ %r/^helene-s3-bucket-test/}}
   end
 
   def create_bucket_by_url
