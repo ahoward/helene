@@ -77,6 +77,7 @@ module Helene
           force ? interface.force_delete_bucket(name) : interface.delete_bucket(name)
         end
         alias_method 'destroy', 'delete'
+
       end
 
       attr_accessor :name
@@ -381,6 +382,20 @@ module Helene
 
       def location # '' or 'EU'
         @location ||= @interface.bucket_location(name)
+      end
+
+      CrossDomain = <<-__
+        <?xml version="1.0"?>
+        <!DOCTYPE cross-domain-policy SYSTEM
+          "http://www.macromedia.com/xml/dtds/cross-domain-policy.dtd">
+        <cross-domain-policy>
+          <allow-access-from domain="*" />
+        </cross-domain-policy>
+      __
+      # CrossDomain.replace(CrossDomain.map{|line| line.strip}.join)
+
+      def crossdomain!
+        put(CrossDomain, 'crossdomain.xml')
       end
       
     # TODO - totally untested

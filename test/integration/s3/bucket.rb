@@ -113,6 +113,12 @@ testing Bucket = Helene::S3::Bucket do
           assert{ !bucket.ls.empty? }
         end
       end
+
+      should "be able to crossdomain-ize" do
+        object = assert{ bucket.crossdomain! }
+        data = assert{ bucket.get(object.name).data }
+        assert{ data['<cross-domain-policy>'] }
+      end
     end
   end
 
