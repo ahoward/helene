@@ -397,6 +397,12 @@ module Helene
       def crossdomain!
         put(CrossDomain, 'crossdomain.xml')
       end
+
+      def crossdomain?
+        return(@crossdomain) if defined?(@crossdomain)
+        object = get('crossdomain.xml')
+        @crossdomain = !!(object && object.data['<cross-domain-policy>'])
+      end
       
     # TODO - totally untested
     #
