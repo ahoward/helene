@@ -384,14 +384,16 @@ module Helene
         @location ||= @interface.bucket_location(name)
       end
 
-      CrossDomain = <<-__
-        <?xml version="1.0"?>
-        <!DOCTYPE cross-domain-policy SYSTEM
-          "http://www.macromedia.com/xml/dtds/cross-domain-policy.dtd">
-        <cross-domain-policy>
-          <allow-access-from domain="*" />
-        </cross-domain-policy>
-      __
+      unless defined?(CrossDomain)
+        CrossDomain = <<-__
+          <?xml version="1.0"?>
+          <!DOCTYPE cross-domain-policy SYSTEM
+            "http://www.macromedia.com/xml/dtds/cross-domain-policy.dtd">
+          <cross-domain-policy>
+            <allow-access-from domain="*" />
+          </cross-domain-policy>
+        __
+      end
       # CrossDomain.replace(CrossDomain.map{|line| line.strip}.join)
 
       def crossdomain!

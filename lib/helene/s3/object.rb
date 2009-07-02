@@ -2,9 +2,9 @@ module Helene
   module S3
     class Object
       class << Object
-        MetaHeader = 'x-amz-meta'
-        MetaHeaderPrefix = MetaHeader + '-'
-        ACLHeader = 'x-amz-acl'
+        MetaHeader = 'x-amz-meta' unless defined?(MetaHeader)
+        MetaHeaderPrefix = MetaHeader + '-' unless defined?(MetaHeaderPrefix)
+        ACLHeader = 'x-amz-acl' unless defined?(ACLHeader)
 
         def partition_into_meta_headers(headers) #:nodoc:
           hash = headers.dup
