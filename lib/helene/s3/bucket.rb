@@ -82,14 +82,18 @@ module Helene
         @interface = options[:interface] || S3.interface
         @owner = options[:owner]
         @creation_date = options[:creation_date]
-        @prefix = cleanpath(options[:prefix]) if options[:prefix]
+        @prefix = Key.clean(options[:prefix]) if options[:prefix]
         if @creation_date && !@creation_date.is_a?(Time)
           @creation_date = Time.parse(@creation_date)
         end
       end
 
+      def bucket
+        self
+      end
+
       def prefix= *prefixes
-        @prefix = cleanpath(*prefixes)
+        @prefix = Key.clean(*prefixes)
       end
 
       def to_s
@@ -98,15 +102,6 @@ module Helene
 
       def == other
         name == other.name and prefix == other.prefix
-      end
-
-      def cleanpath(*paths)
-        path = File.join(*paths.flatten.compact)
-        path = path.to_s.strip
-        path.sub! %r|^[./]+|, ''
-        path.sub! %r|/*$|, '/'
-        path.squeeze! '/'
-        path
       end
 
       def prefixed(path, &block)
@@ -122,9 +117,21 @@ module Helene
         end
       end
 
+      def prefixed_key_for(key)
+        return key if key.is_a?(Key)
+        Key.new(key.to_s, :prefix => @prefix)
+      end
+
+      def prefixed_key_from(key)
+        return key if key.is_a?(Key)
+        key = key.to_s
+        key[%r/\A#{ Regexp.escape(@prefix) }/] = '' if @prefix
+        Key.new(key, :prefix => @prefix)
+      end
+
       def scoping(suffix, &block)
         old = @prefix
-        @prefix = cleanpath(@prefix, suffix)
+        @prefix = Key.clean(@prefix, suffix)
         block.call
       ensure
         @prefix = old
@@ -133,7 +140,7 @@ module Helene
 
       def / suffix
         bucket = clone
-        bucket.prefix = cleanpath(@prefix, suffix)
+        bucket.prefix = Key.clean(@prefix, suffix)
         bucket
       end
 
@@ -146,26 +153,26 @@ module Helene
 
         io_for(data) do |io|
           path = args.shift || path_for(io)
-          key = key_for(path, io, meta)
+          object = object_for(path, io, meta)
           headers = headers_for(path, headers)
-          key.put(io, perms, headers)
-          key
+          object.put(io, perms, headers)
+          object
         end
       end
 
       def get(path, *args, &block)
         options = args.extract_options!.to_options!
         headers = options.delete(:headers) || {}
-        key = key_for(path)
-        key.get(headers)
+        object = object_for(path)
+        object.get(headers)
       end
 
-# TODO - return a blob?
       def read(path, *args, &block)
         get(path, *args, &block).data
       end
 
-# TODO - handle string inputs better
+# TODO - handle string inputs better - perhaps accepting only pathnames where
+# they are meant and strings==data?
       def io_for(arg)
         return(arg.respond_to?(:read) ? yield(arg) : open(arg.to_s){|io| yield(io)})
       end
@@ -179,12 +186,12 @@ module Helene
           end
         end
         raise Error, "no path from #{ arg.inspect }" if path.blank?
-        cleanpath(path)
+        Key.clean(path)
       end
 
-      def key_for(arg, io = nil, meta = {})
-        return arg if arg.is_a?(Key)
-        Key.create(self, prefixed(arg.to_s), io, meta)
+      def object_for(arg, io = nil, meta = {})
+        return arg if arg.is_a?(Object)
+        Object.new(bucket, prefixed_key_for(arg), :data => io, :meta => meta)
       end
 
       def headers_for(path, headers = {})
@@ -218,17 +225,17 @@ module Helene
             (query ||= {})[:prefix] ||= prefix if prefix
             interface.list_bucket_link(name, query, expires, headers)
           when 'put'
-            interface.put_link(name, prefixed(path), data, expires, headers)
+            interface.put_link(name, prefixed_key_for(path), data, expires, headers)
           when 'get'
-            interface.get_link(name, prefixed(path), expires, headers)
+            interface.get_link(name, prefixed_key_for(path), expires, headers)
           when 'head'
-            interface.head_link(name, prefixed(path), expires, headers)
+            interface.head_link(name, prefixed_key_for(path), expires, headers)
           when 'delete'
-            interface.delete_link(name, prefixed(path), expires, headers)
+            interface.delete_link(name, prefixed_key_for(path), expires, headers)
           when 'get_acl'
-            interface.get_acl_link(name, prefixed(path), headers)
+            interface.get_acl_link(name, prefixed_key_for(path), headers)
           when 'put_acl'
-            interface.put_acl_link(name, prefixed(path), headers)
+            interface.put_acl_link(name, prefixed_key_for(path), headers)
           when 'get_bucket_acl'
             interface.get_bucket_acl_link(name, headers)
           when 'put_bucket_acl'
@@ -249,94 +256,103 @@ module Helene
         end
       end
 
-      def keys(options={}, &block)
+      def objects(options={}, &block)
         options.to_options!
         options[:prefix] ||= prefix
         options.delete(:service)
-        keys_and_service(options, &block)
+        objects_and_service(options, &block)
       end
-      alias_method 'list', 'keys'
+      alias_method 'list', 'objects'
 
       def ls(options = {}, &block)
         names = []
-        keys do |key|
-          block ? block.call(key.name) : names.push(key.name)
+        objects do |object|
+          block ? block.call(object.name) : names.push(object.name)
         end
         block ? nil : names
       end
 
     # TODO - refactor messiness with service
     #
-      def keys_and_service(options={}, &block)
+      def objects_and_service(options={}, &block)
         options.to_options!
         options[:prefix] ||= prefix
         head = options.delete(:head)
         wants_service = options.delete(:service)
         service = {}
         hash = {}
-        keys = []
+        objects = []
         @interface.incrementally_list_bucket(@name, options.stringify_keys) do |hash|
           hash[:contents].each do |entry|
             owner = Owner.new(entry[:owner_id], entry[:owner_display_name])
-            key = Key.new(self, entry[:key], nil, {}, {}, entry[:last_modified], entry[:e_tag], entry[:size], entry[:storage_class], owner)
-            key.head if head
-            block ? block.call(key) : keys.push(key)
+            object = 
+              Object.new(
+                :bucket => bucket,
+                :key => prefixed_key_from(entry[:key]),
+                :last_modified => entry[:last_modified],
+                :e_tag => entry[:e_tag],
+                :size => entry[:size],
+                :storage_class => entry[:storage_class],
+                :owner => owner
+              )
+            object.head if head
+            block ? block.call(object) : objects.push(object)
           end
         end
         if wants_service
           hash.each_key do |key|
             service[key] = hash[key] unless (key == :contents || key == :common_prefixes)
           end
-          [keys, service]
+          [objects, service]
         else
-          block ? nil : keys
+          block ? nil : objects
         end
       end
 
-      def key(path, options={}, &block)
+      def object(path, options={}, &block)
         options.to_options!
-        options[:prefix] ||= prefixed(path.to_s)
-        keys(options).first
+        options[:prefix] ||= prefixed_key_for(path)
+        objects(options).first
       end
-      alias_method '[]', 'key'
+      alias_method '[]', 'object'
 
-    # TODO - refactor, possibly place in key.rb
+    # TODO - refactor, possibly place in object.rb
     #
-      def find_or_create_key_by_absolute_path(path, options = {})
+      def find_or_create_object_by_absolute_path(path, options = {})
         path = path.to_s
         options.to_options!
         head = options.has_key?(:head) ? options.delete(:head) : true
-        key = nil
-        keys(:prefix => path, :head => head).each do |candidate|
-          break(key = candidate) if candidate.name == path
+        object = nil
+        objects(:prefix => path, :head => head).each do |candidate|
+          break(object = candidate) if candidate.name == path
         end
-        key ||= Key.create(self, path)
+        object ||= Object.new(bucket, path)
       end
 
       def has_key?(path)
-        find_or_create_key_by_absolute_path(prefixed(path)).exists?
+        find_or_create_object_by_absolute_path(prefixed_key_for(path)).exists?
       end
 
-      def rename_key(src, dst)
-        src = Key.create(self, prefixed(src.to_s)) unless src.is_a?(Key)
-        src.rename(prefixed(dst))
+      def rename_object(src, dst)
+        src = Object.new(bucket, prefixed_key_for(src)) unless src.is_a?(Object)
+        src.rename(prefixed_key_for(dst))
         src
       end
-      alias_method 'rename', 'rename_key'
+      alias_method 'rename', 'rename_object'
 
-      def copy_key(src, dst)
-        src = Key.create(self, prefixed(src.to_s)) unless src.is_a?(Key)
-        src.copy(prefixed(dst))
+      def copy_object(src, dst)
+        src = Object.new(bucket, prefixed_key_for(src)) unless src.is_a?(Object)
+        src.copy(prefixed_key_for(dst))
       end
-      alias_method 'cp', 'copy_key'
-      alias_method 'copy', 'copy_key'
+      alias_method 'cp', 'copy_object'
+      alias_method 'copy', 'copy_object'
       
-      def move_key(src, dst)
-        src = Key.create(self, prefixed(src.to_s)) unless src.is_a?(Key)
-        src.move(prefixed(dst))
+      def move_object(src, dst)
+        src = Object.new(bucket, prefixed_key_for(src)) unless src.is_a?(Object)
+        src.move(prefixed_key_for(dst))
       end
-      alias_method 'mv', 'move_key'
-      alias_method 'move', 'move_key'
+      alias_method 'mv', 'move_object'
+      alias_method 'move', 'move_object'
 
       def location # '' or 'EU'
         @location ||= @interface.bucket_location(name)

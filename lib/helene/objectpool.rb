@@ -130,7 +130,7 @@ module Helene
     end
   end
 
-  Objectpool = ObjectPool
+  Helene::Objectpool = Helene::ObjectPool unless defined?(Helene::Objectpool)
 
   def ObjectPool(*args, &block)
     ObjectPool.new(*args, &block)

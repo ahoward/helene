@@ -43,18 +43,18 @@ testing Bucket = Helene::S3::Bucket do
       end
 
       should 'be able to put a pathname' do
-        key = assert{ bucket.put(@pathname) }
-        assert{ curl(key.url) == @data }
+        object = assert{ bucket.put(@pathname) }
+        assert{ curl(object.url) == @data }
       end
 
       should "be able to put an io - returning an object that knows it's url" do
-        key = assert{ open(@pathname){|io| bucket.put(io)} }
-        assert{ curl(key.url) == @data }
+        object = assert{ open(@pathname){|io| bucket.put(io)} }
+        assert{ curl(object.url) == @data }
       end
 
       should "be able to put/get a path" do
-        key = assert{ bucket.put(@pathname) }
-        data = assert{ bucket.get(key.name) }
+        object = assert{ bucket.put(@pathname) }
+        data = assert{ bucket.get(object.name).data }
         assert{ data == @data }
       end
     
@@ -67,8 +67,8 @@ testing Bucket = Helene::S3::Bucket do
         end
       
         should "put under the prefix" do
-          key = assert{ bucket.put(@pathname) }
-          assert{ key.url.include?("/#{@prefix}/") }
+          object = assert{ bucket.put(@pathname) }
+          assert{ object.url.include?("/#{@prefix}/") }
         end
 
         should "get under the prefix" do
@@ -78,7 +78,7 @@ testing Bucket = Helene::S3::Bucket do
           # should be nothing there
           assert{
             begin
-              bucket.get(@pathname).nil?
+              bucket.get(@pathname).data.nil?
               false
             rescue RightAws::AwsError
               true
@@ -86,13 +86,13 @@ testing Bucket = Helene::S3::Bucket do
           }
           
           # now add the data
-          key = assert{ bucket.put(@pathname) }
+          object = assert{ bucket.put(@pathname) }
           
           # 
           # ensure that we can now read the data back
           # (without an explicit prefix)
           # 
-          data = assert{ bucket.get(key.name) }
+          data = assert{ bucket.get(object.name).data }
           assert{ data == @data }
         end
 
