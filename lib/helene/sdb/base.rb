@@ -343,9 +343,8 @@ module Helene
         alias_method 'find', 'select'
 
         def method_missing(message, *args, &block)
-          message = message.to_s
           re = %r/^(?:find|select)(_all)?_by_(.*)$/io
-          match, all, clause = message.match(re).to_a
+          match, all, clause = message.to_s.match(re).to_a
           super unless match
           clauses = clause.split(%r/_and_/io)
           conditions = clauses.inject(Hash.new){|hash,attr| hash.update attr => args.shift} 
