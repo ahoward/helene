@@ -28,8 +28,8 @@ module Helene
       def connection
         @connection ||= ConnectionProxy.new
       end
+      alias_method 'interface', 'connection'
     end
-
     @connections = ObjectPool.new(:size => 8){ create_connection }
   end
 end
