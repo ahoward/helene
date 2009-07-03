@@ -59,17 +59,16 @@ module Helene
     def checkout(blocking=true)
       lock {
         loop do
-          if create_object?
-            @objects << (object = new_object())
-            @used[object] = Thread.current
-            return object
-          end
-
           free = @objects.select{|object| not @used[object]}
           unless free.empty?
             object = free[ rand(free.size) ]
             @used[object] = Thread.current
-# puts "#{ Thread.current.object_id } using #{ object.inspect }"
+            return object
+          end
+
+          if create_object?
+            @objects << (object = new_object())
+            @used[object] = Thread.current
             return object
           end
 
