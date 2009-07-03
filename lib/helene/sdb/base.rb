@@ -615,33 +615,55 @@ module Helene
             lhs = escape_attribute(key =~ %r/^\s*id\s*$/oi ? ItemName : key)
 
             rhs =
-              if value.is_a?(Array)
-                first = value.first.to_s.strip.downcase.gsub(%r/\s+/, ' ')
-                if(first.delete('() ') == 'every')
-                  every = value.shift
-                  op = value.first.to_s.strip.downcase.gsub(%r/\s+/, ' ')
+              case value
+                when Array
+                  first = value.first.to_s.strip.downcase.gsub(%r/\s+/, ' ')
+                  if(first.delete('() ') == 'every')
+                    every = value.shift
+                    op = value.first.to_s.strip.downcase.gsub(%r/\s+/, ' ')
+                  else
+                    every = false 
+                    op = first
+                  end
+                  case op
+                    when '=', '!=', '>', '>=', '<', '<=', 'like', 'not like'
+                      list = value[1..-1].flatten.map{|val| to_condition(key, val)}
+                      "#{ op } #{ list.join(',') }"
+                    when 'between'
+                      a, b, *ignored = value[1..-1].flatten.map{|val| to_condition(key, val)}
+                      "between #{ a } and #{ b }"
+                    when 'is null'
+                      'is null'
+                    when 'is not null'
+                      'is not null'
+                    else # 'in'
+                      value.shift if op == 'in'
+                      list = value.flatten.map{|val| to_condition(key, val)}
+                      "in (#{ list.join(',') })"
+                  end
+
+                when Hash
+                  value.to_options!
+                  every = value.delete(:_every) || false
+                  op = value.delete(:_op) || 'in' 
+                  case op
+                    when '=', '!=', '>', '>=', '<', '<=', 'like', 'not like'
+                      list = value[1..-1].flatten.map{|val| to_condition(key, val)}
+                      "#{ op } #{ list.join(',') }"
+                    when 'between'
+                      a, b, *ignored = value[1..-1].flatten.map{|val| to_condition(key, val)}
+                      "between #{ a } and #{ b }"
+                    when 'is null'
+                      'is null'
+                    when 'is not null'
+                      'is not null'
+                    else # 'in'
+                      list = value.to_a.map{|pair| to_condition(key, pair)}
+                      "in (#{ list.join(',') })"
+                  end
+
                 else
-                  every = false 
-                  op = first
-                end
-                case op
-                  when '=', '!=', '>', '>=', '<', '<=', 'like', 'not like'
-                    list = value[1..-1].flatten.map{|val| to_condition(key, val)}
-                    "#{ op } #{ list.join(',') }"
-                  when 'between'
-                    a, b, *ignored = value[1..-1].flatten.map{|val| to_condition(key, val)}
-                    "between #{ a } and #{ b }"
-                  when 'is null'
-                    'is null'
-                  when 'is not null'
-                    'is not null'
-                  else # 'in'
-                    value.shift if op == 'in'
-                    list = value.flatten.map{|val| to_condition(key, val)}
-                    "in (#{ list.join(',') })"
-                end
-              else
-                "= #{ to_condition(key, value) }"
+                  "= #{ to_condition(key, value) }"
               end
 
             lhs = "every(#{ lhs })" if every

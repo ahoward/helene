@@ -117,6 +117,32 @@ module Helene
             value.to_s
           end
         }
+
+        type(:keyval){
+          ruby_to_sdb do |value|
+            value.to_hash.to_a.map{|pair| pair.join('=')}
+          end
+
+          sdb_to_ruby do |value|
+            hash = HashWithIndifferentAccess.new
+            Array(value).each do |pair|
+              key, val = pair.split(%r/=/, 2)
+              hash[key] = val
+            end
+            hash
+          end
+
+          to_condition do |value|
+            case value
+              when Hash
+                value.to_hash.to_a.map{|pair| pair.join('=')}
+              when Array
+                "#{ value[0] }=#{ value[1..-1] }"
+              else
+                value
+            end
+          end
+        }
       end
     end
   end
