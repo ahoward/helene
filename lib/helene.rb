@@ -100,6 +100,7 @@ module Helene
     load 'settings.rb'
     load 'sdb.rb'
     load 's3.rb'
+    load 'sqs.rb'
     load 'rails.rb' if defined?(Rails)
   end
 
