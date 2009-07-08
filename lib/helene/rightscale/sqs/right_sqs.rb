@@ -24,6 +24,13 @@
 module RightAws
 
     #
+    #--
+    # This file was orginally right_sqs_gen2.rb and the main class was similarly
+    # named SqsGen2.  Under the hood it made use of SqsGen2Interface, but that 
+    # too has been renamed and this code has changed accordingly.  These changes
+    # are to replace the old obsolete interface.
+    #++
+    # 
     # RightAws::SqsGen2 -- RightScale's Amazon SQS interface, API version
     # 2008-01-01 and later.
     # The RightAws::SqsGen2 class provides a complete interface to the second generation of Amazon's Simple
@@ -63,11 +70,11 @@ module RightAws
     #     :multi_thread => true|false            # Multi-threaded (connection per each thread): true or false (default)
     #     :signature_version => '0'              # The signature version : '0' or '1'(default)
     #     :logger       => Logger Object}        # Logger instance: logs to STDOUT if omitted }
-  class SqsGen2
+  class Sqs
     attr_reader :interface
     
     def initialize(aws_access_key_id=nil, aws_secret_access_key=nil, params={})
-      @interface = SqsGen2Interface.new(aws_access_key_id, aws_secret_access_key, params)
+      @interface = SqsInterface.new(aws_access_key_id, aws_secret_access_key, params)
     end
     
       # Retrieves a list of queues. 

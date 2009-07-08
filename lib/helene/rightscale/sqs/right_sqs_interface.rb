@@ -24,6 +24,12 @@
 module RightAws
 
   #
+  #--
+  # This file was orginally right_sqs_gen2_interface.rb and the main class was
+  # similarly named SqsGen2Interface.  It has been renamed to replace the old
+  # obsolete interface.
+  #++
+  # 
   # Right::Aws::SqsGen2Interface - RightScale's low-level Amazon SQS interface
   # for API version 2008-01-01 and later.
   # For explanations of the semantics
@@ -35,7 +41,7 @@ module RightAws
   # bare SQS API.  For a somewhat higher-level and object-oriented interface, see
   # RightAws::SqsGen2. 
 
-  class SqsGen2Interface < RightAwsBase
+  class SqsInterface < RightAwsBase
     include RightAwsBaseInterface
     
     API_VERSION       = "2008-01-01"
