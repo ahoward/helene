@@ -854,6 +854,7 @@ module Helene
     # equality method
     #
       def == other
+        return false unless other.is_a?(Base)
         domain == other.domain and id == other.id
       end
 
