@@ -851,6 +851,12 @@ module Helene
         end
       end
 
+    # equality method
+    #
+      def == other
+        domain == other.domain and id == other.id
+      end
+
       def klass
         self.class
       end
