@@ -92,6 +92,7 @@ module Helene
     load 'sleepcycle.rb'
     load 'superhash.rb'
     load 'objectpool.rb'
+    load 'connectable.rb'
     load 'attempt.rb'
     load 'content_type.rb'
     load 'logging.rb'
