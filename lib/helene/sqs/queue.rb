@@ -98,11 +98,11 @@ module Helene
       alias_method :nq,           :queue
       alias_method :send_message, :queue
       
-      def receive_messages(max_count = 1, visibility_timeout = nil)
+      def receive_messages(max_count = 10, visibility_timeout = nil)
         require_url
         begin
           interface.receive_message(@url, max_count, visibility_timeout).
-                    map { |fields| Message.new(fields) }
+                    map { |fields| Message.new(self, fields) }
         rescue Exception
           [ ]
         end
