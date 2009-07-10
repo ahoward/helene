@@ -9,6 +9,7 @@ module Helene
   require 'ostruct'
   require 'logger'
   require 'pathname'
+  require 'digest/md5'
 
 # rubygems
 #
