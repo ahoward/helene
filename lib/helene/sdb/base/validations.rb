@@ -156,6 +156,7 @@ module Helene
             args = atts + [{:on => opts[:on]}]
             validates_each(*args) do |o, a, v|
               next if (v.nil? && opts[:allow_nil]) || (v.blank? && opts[:allow_blank])
+              next if validation_skipped_by_conditions?(o, opts)
               o.errors[a] << opts[:message] unless v == opts[:accept]
             end
           end
@@ -168,8 +169,10 @@ module Helene
             atts.each { |a| attr_accessor :"#{a}_confirmation" }
             
             args = atts + [{:on => opts[:on]}]
+
             validates_each(*args) do |o, a, v|
               next if (v.nil? && opts[:allow_nil]) || (v.blank? && opts[:allow_blank])
+              next if validation_skipped_by_conditions?(o, opts)
               c = o.send(:"#{a}_confirmation")
               o.errors[a] << opts[:message] unless v == c
             end
@@ -187,6 +190,7 @@ module Helene
             args = atts + [{:on => opts[:on]}]
             validates_each(*args) do |o, a, v|
               next if (v.nil? && opts[:allow_nil]) || (v.blank? && opts[:allow_blank])
+              next if validation_skipped_by_conditions?(o, opts)
               o.errors[a] << opts[:message] unless v.to_s =~ opts[:with]
             end
           end
@@ -201,6 +205,7 @@ module Helene
             args = atts + [{:on => opts[:on]}]
             validates_each(*args) do |o, a, v|
               next if (v.nil? && opts[:allow_nil]) || (v.blank? && opts[:allow_blank])
+              next if validation_skipped_by_conditions?(o, opts)
               if m = opts[:maximum]
                 o.errors[a] << (opts[:message] || opts[:too_long]) unless v && v.size <= m
               end
@@ -232,6 +237,7 @@ module Helene
             args = atts + [{:on => opts[:on]}]
             validates_each(*args) do |o, a, v|
               next if (v.nil? && opts[:allow_nil]) || (v.blank? && opts[:allow_blank])
+              next if validation_skipped_by_conditions?(o, opts)
               #o.errors[a] << opts[:message] unless v.to_s =~ re
               o.errors[a] << opts[:message] unless number[v]
             end
@@ -244,8 +250,21 @@ module Helene
             
             args = atts + [{:on => opts[:on]}]
             validates_each(*args) do |o, a, v|
+              next if validation_skipped_by_conditions?(o, opts)
               o.errors[a] << opts[:message] unless v && !v.blank?
             end
+          end
+
+          def validation_skipped_by_conditions?(object, options)
+            skipped_by_if =
+              if condition = options[:if]
+                !!!object.send(:instance_eval, &condition.to_proc)
+              end
+            skipped_by_unless =
+              if condition = options[:unless]
+                !!object.send(:instance_eval, &condition.to_proc)
+              end
+            skipped_by_if or skipped_by_unless
           end
         end
       end

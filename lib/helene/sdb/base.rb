@@ -942,7 +942,7 @@ module Helene
       end
 
       def update(options = {})
-        attributes.update(options)
+        options.each{|k,v| send("#{ k }=", v)}
       end
 
       def raising_an_error?
