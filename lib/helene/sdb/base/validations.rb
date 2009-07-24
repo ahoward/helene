@@ -55,8 +55,6 @@ module Helene
 
           def initialize object = nil
             @object = object
-            block = lambda{|h,k| h[k] = []}
-            super(&block)
           end
 
           def Errors._load(string)
@@ -76,7 +74,7 @@ module Helene
           end
           
           def add(att, msg)
-            self[att] << msg
+            (self[att] ||= []) << msg
           end
           
           def full_messages
@@ -157,7 +155,7 @@ module Helene
             validates_each(*args) do |o, a, v|
               next if (v.nil? && opts[:allow_nil]) || (v.blank? && opts[:allow_blank])
               next if validation_skipped_by_conditions?(o, opts)
-              o.errors[a] << opts[:message] unless v == opts[:accept]
+              o.errors.add(a, opts[:message]) unless v == opts[:accept]
             end
           end
 
@@ -174,7 +172,7 @@ module Helene
               next if (v.nil? && opts[:allow_nil]) || (v.blank? && opts[:allow_blank])
               next if validation_skipped_by_conditions?(o, opts)
               c = o.send(:"#{a}_confirmation")
-              o.errors[a] << opts[:message] unless v == c
+              o.errors.add(a, opts[:message]) unless v == c
             end
           end
 
@@ -191,7 +189,7 @@ module Helene
             validates_each(*args) do |o, a, v|
               next if (v.nil? && opts[:allow_nil]) || (v.blank? && opts[:allow_blank])
               next if validation_skipped_by_conditions?(o, opts)
-              o.errors[a] << opts[:message] unless v.to_s =~ opts[:with]
+              o.errors.add(a, opts[:message]) unless v.to_s =~ opts[:with]
             end
           end
 
@@ -207,16 +205,16 @@ module Helene
               next if (v.nil? && opts[:allow_nil]) || (v.blank? && opts[:allow_blank])
               next if validation_skipped_by_conditions?(o, opts)
               if m = opts[:maximum]
-                o.errors[a] << (opts[:message] || opts[:too_long]) unless v && v.size <= m
+                o.errors.add(a, opts[:message] || opts[:too_long]) unless v && v.size <= m
               end
               if m = opts[:minimum]
-                o.errors[a] << (opts[:message] || opts[:too_short]) unless v && v.size >= m
+                o.errors.add(a, opts[:message] || opts[:too_short]) unless v && v.size >= m
               end
               if i = opts[:is]
-                o.errors[a] << (opts[:message] || opts[:wrong_length]) unless v && v.size == i
+                o.errors.add(a, opts[:message] || opts[:wrong_length]) unless v && v.size == i
               end
               if w = opts[:within]
-                o.errors[a] << (opts[:message] || opts[:wrong_length]) unless v && w.include?(v.size)
+                o.errors.add(a, opts[:message] || opts[:wrong_length]) unless v && w.include?(v.size)
               end
             end
           end
@@ -238,8 +236,7 @@ module Helene
             validates_each(*args) do |o, a, v|
               next if (v.nil? && opts[:allow_nil]) || (v.blank? && opts[:allow_blank])
               next if validation_skipped_by_conditions?(o, opts)
-              #o.errors[a] << opts[:message] unless v.to_s =~ re
-              o.errors[a] << opts[:message] unless number[v]
+              o.errors.add(a, opts[:message]) unless number[v]
             end
           end
 
@@ -251,7 +248,7 @@ module Helene
             args = atts + [{:on => opts[:on]}]
             validates_each(*args) do |o, a, v|
               next if validation_skipped_by_conditions?(o, opts)
-              o.errors[a] << opts[:message] unless v && !v.blank?
+              o.errors.add(a, opts[:message]) unless v && !v.blank?
             end
           end
 
